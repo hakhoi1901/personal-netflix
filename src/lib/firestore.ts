@@ -4,6 +4,7 @@ import {
     getDocs,
     getDoc,
     addDoc,
+    updateDoc,
     query,
     orderBy,
 } from 'firebase/firestore';
@@ -70,4 +71,35 @@ export async function addMovie(
     const docRef = await addDoc(collection(db, COLLECTION_NAME), payload);
 
     return docRef.id;
+}
+
+/**
+ * Update an existing movie document in Firestore.
+ * Merges the provided fields into the document. If episodes are included,
+ * they are sorted by their order field before saving.
+ * Always updates the `updatedAt` timestamp.
+ */
+export async function updateMovie(
+    id: string,
+    data: Partial<Omit<Movie, 'id' | 'createdAt'>>
+): Promise<void> {
+    const payload: Record<string, unknown> = {
+        ...data,
+        updatedAt: Date.now(),
+    };
+
+    // Sort episodes by order if they are being updated
+    if (payload.episodes && Array.isArray(payload.episodes)) {
+        payload.episodes = [...(payload.episodes as Episode[])].sort(
+            (a, b) => a.order - b.order
+        );
+    }
+
+    // Firestore does NOT accept `undefined` — strip those keys
+    Object.keys(payload).forEach((key) => {
+        if (payload[key] === undefined) delete payload[key];
+    });
+
+    const docRef = doc(db, COLLECTION_NAME, id);
+    await updateDoc(docRef, payload);
 }
