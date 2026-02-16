@@ -1,6 +1,3 @@
-// Force dynamic rendering since the layout uses client-side Firebase Auth
-export const dynamic = 'force-dynamic';
-
 export default function NotFound() {
     return (
         <div className="min-h-screen bg-zinc-950 flex items-center justify-center">

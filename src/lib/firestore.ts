@@ -5,6 +5,7 @@ import {
     getDoc,
     addDoc,
     updateDoc,
+    setDoc,
     query,
     orderBy,
 } from 'firebase/firestore';
@@ -12,6 +13,48 @@ import { db } from '@/firebase/config';
 import { Movie, Episode } from '@/types/movie';
 
 const COLLECTION_NAME = 'movies';
+
+// ─── Watch Progress Types & Functions ────────────────────────────────
+
+export interface WatchProgress {
+    movieId: string;
+    episodeId: string;
+    lastWatchedAt: number;
+}
+
+/**
+ * Save the user's current watch progress for a specific movie.
+ * Uses setDoc with merge to upsert the progress document.
+ * Path: users/{userId}/progress/{movieId}
+ */
+export async function saveWatchProgress(
+    userId: string,
+    movieId: string,
+    episodeId: string
+): Promise<void> {
+    const progressRef = doc(db, 'users', userId, 'progress', movieId);
+    await setDoc(progressRef, {
+        movieId,
+        episodeId,
+        lastWatchedAt: Date.now(),
+    });
+}
+
+/**
+ * Fetch all watch progress documents for a given user.
+ * Returns an array of WatchProgress sorted by most recently watched.
+ */
+export async function getUserProgress(userId: string): Promise<WatchProgress[]> {
+    const progressRef = collection(db, 'users', userId, 'progress');
+    const snapshot = await getDocs(progressRef);
+
+    const progress = snapshot.docs.map((d) => ({
+        ...(d.data() as WatchProgress),
+    }));
+
+    // Sort by most recently watched first
+    return progress.sort((a, b) => b.lastWatchedAt - a.lastWatchedAt);
+}
 
 /**
  * Fetch all movies from Firestore, ordered by creation date (newest first).

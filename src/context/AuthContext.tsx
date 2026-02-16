@@ -34,7 +34,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setLoading(false);
         });
 
-        return () => unsubscribe();
+        // Safety timeout: if Firebase auth never responds (network issues on mobile),
+        // stop loading after 5 seconds so the app can redirect to login
+        const timeout = setTimeout(() => {
+            setLoading(false);
+        }, 5000);
+
+        return () => {
+            unsubscribe();
+            clearTimeout(timeout);
+        };
     }, []);
 
     return (

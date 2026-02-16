@@ -1,7 +1,5 @@
-// Force all routes to be dynamically rendered (Firebase Auth requires browser env)
-export const dynamic = 'force-dynamic';
 
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
@@ -17,6 +15,13 @@ export const metadata: Metadata = {
   description: "Your personal movie and series streaming platform",
 };
 
+export const viewport: Viewport = {
+  themeColor: '#09090b',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -24,7 +29,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body className={`${inter.variable} antialiased bg-zinc-950 text-white`}>
+      <head>
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+      </head>
+      <body className={`${inter.variable} antialiased bg-zinc-950 text-white`} suppressHydrationWarning>
         <AuthProvider>
           <AuthGuard>{children}</AuthGuard>
         </AuthProvider>

@@ -15,7 +15,8 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     const router = useRouter();
     const pathname = usePathname();
 
-    const isLoginPage = pathname === '/login';
+    // trailingSlash: true in next.config means pathname may be '/login/' or '/login'
+    const isLoginPage = pathname === '/login' || pathname === '/login/';
 
     useEffect(() => {
         if (loading) return;
@@ -29,8 +30,9 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
         }
     }, [user, loading, isLoginPage, router]);
 
-    // Show loading spinner while auth state resolves
-    if (loading) {
+    // Show loading spinner while auth state resolves OR while redirect is in progress
+    // On mobile, router.push() can be slow — returning null would show a black screen
+    if (loading || (!user && !isLoginPage) || (user && isLoginPage)) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-zinc-950">
                 <div className="flex flex-col items-center gap-4">
@@ -39,16 +41,6 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
                 </div>
             </div>
         );
-    }
-
-    // If not logged in and not on login page, don't render children (redirect is in progress)
-    if (!user && !isLoginPage) {
-        return null;
-    }
-
-    // If logged in and on login page, don't render children (redirect is in progress)
-    if (user && isLoginPage) {
-        return null;
     }
 
     return <>{children}</>;
