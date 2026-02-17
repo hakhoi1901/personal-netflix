@@ -1,14 +1,19 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import Link from 'next/link';
 import { Movie } from '@/types/movie';
+import * as XLSX from 'xlsx';
 import {
     HiOutlineArrowLeft,
     HiOutlinePlus,
     HiOutlineTrash,
     HiOutlineFilm,
+    HiOutlineArrowUpTray,
+    HiOutlineChevronUp,
+    HiOutlineChevronDown,
+    HiOutlineBarsArrowDown,
 } from 'react-icons/hi2';
 
 export interface EpisodeInput {
@@ -57,15 +62,91 @@ export default function MovieForm({ initialData, onSubmit, submitting }: MovieFo
         handleSubmit,
         watch,
         reset,
+        getValues,
+        setValue,
         formState: { errors },
     } = form;
 
-    const { fields, append, remove } = useFieldArray({
+    const { fields, append, remove, swap } = useFieldArray({
         control,
         name: 'episodes',
     });
 
     const category = watch('category');
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    /**
+     * Handle Excel file import for bulk episode addition.
+     * Expects 2 columns: episode title & Google Drive ID.
+     * Supports headers: Title/Tên tập (col 1), Drive ID/ID (col 2).
+     */
+    const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            try {
+                const data = new Uint8Array(evt.target?.result as ArrayBuffer);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                const rows: Record<string, string>[] = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+                if (rows.length === 0) {
+                    alert('File Excel trống hoặc không đúng định dạng.');
+                    return;
+                }
+
+                // Detect column names flexibly
+                const headers = Object.keys(rows[0]);
+                const titleKey = headers.find((h) =>
+                    /^(title|tên\s*tập|ten\s*tap|episode|ep)/i.test(h.trim())
+                ) ?? headers[0];
+                const driveIdKey = headers.find((h) =>
+                    /^(drive\s*id|id|driveid|drive)/i.test(h.trim())
+                ) ?? headers[1];
+
+                if (!titleKey || !driveIdKey) {
+                    alert('Không tìm thấy cột "Tên tập" và "ID". Vui lòng kiểm tra lại file.');
+                    return;
+                }
+
+                const episodes: EpisodeInput[] = rows
+                    .filter((row) => String(row[titleKey]).trim() && String(row[driveIdKey]).trim())
+                    .map((row) => ({
+                        title: String(row[titleKey]).trim(),
+                        driveId: String(row[driveIdKey]).trim(),
+                    }));
+
+                if (episodes.length === 0) {
+                    alert('Không tìm thấy tập hợp lệ nào trong file.');
+                    return;
+                }
+
+                // Append all parsed episodes
+                episodes.forEach((ep) => append(ep));
+                alert(`Đã nhập thành công ${episodes.length} tập!`);
+            } catch (err) {
+                console.error('Excel import error:', err);
+                alert('Lỗi khi đọc file Excel. Vui lòng kiểm tra lại định dạng.');
+            }
+        };
+        reader.readAsArrayBuffer(file);
+
+        // Reset input so the same file can be re-selected
+        e.target.value = '';
+    };
+
+    /**
+     * Sort all episodes alphabetically by title (A → Z).
+     */
+    const handleSortByTitle = () => {
+        const current = getValues('episodes');
+        const sorted = [...current].sort((a, b) =>
+            a.title.localeCompare(b.title, 'vi', { numeric: true, sensitivity: 'base' })
+        );
+        setValue('episodes', sorted);
+    };
 
     // Populate form when initialData is provided (Edit mode)
     useEffect(() => {
@@ -230,15 +311,42 @@ export default function MovieForm({ initialData, onSubmit, submitting }: MovieFo
                                 </div>
                             </div>
 
-                            {/* Add Episode Button */}
-                            <button
-                                type="button"
-                                onClick={() => append({ title: '', driveId: '' })}
-                                className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-400 text-sm font-medium rounded-lg transition-all"
-                            >
-                                <HiOutlinePlus className="w-4 h-4" />
-                                Add
-                            </button>
+                            {/* Actions: Sort + Import Excel + Add */}
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={handleSortByTitle}
+                                    disabled={fields.length <= 1}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 text-sm font-medium rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                                    title="Sort episodes A → Z"
+                                >
+                                    <HiOutlineBarsArrowDown className="w-4 h-4" />
+                                    Sort
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 text-sm font-medium rounded-lg transition-all"
+                                >
+                                    <HiOutlineArrowUpTray className="w-4 h-4" />
+                                    Import
+                                </button>
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept=".xlsx,.xls"
+                                    onChange={handleExcelImport}
+                                    className="hidden"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => append({ title: '', driveId: '' })}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-400 text-sm font-medium rounded-lg transition-all"
+                                >
+                                    <HiOutlinePlus className="w-4 h-4" />
+                                    Add
+                                </button>
+                            </div>
                         </div>
 
                         {/* Validation: at least 1 episode */}
@@ -292,7 +400,27 @@ export default function MovieForm({ initialData, onSubmit, submitting }: MovieFo
                                         )}
                                     </div>
 
-                                    {/* Delete Button */}
+                                    {/* Reorder & Delete */}
+                                    <div className="flex flex-col gap-0.5 flex-shrink-0 mt-0.5">
+                                        <button
+                                            type="button"
+                                            onClick={() => swap(index, index - 1)}
+                                            disabled={index === 0}
+                                            className="p-1 text-zinc-500 hover:text-white hover:bg-white/10 rounded transition-all disabled:opacity-20 disabled:cursor-not-allowed"
+                                            title="Move up"
+                                        >
+                                            <HiOutlineChevronUp className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => swap(index, index + 1)}
+                                            disabled={index === fields.length - 1}
+                                            className="p-1 text-zinc-500 hover:text-white hover:bg-white/10 rounded transition-all disabled:opacity-20 disabled:cursor-not-allowed"
+                                            title="Move down"
+                                        >
+                                            <HiOutlineChevronDown className="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
                                     <button
                                         type="button"
                                         onClick={() => remove(index)}
