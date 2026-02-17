@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useEffect, useState, useCallback } from 'react';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { getMovieById, saveWatchProgress } from '@/lib/firestore';
 import { useAuth } from '@/context/AuthContext';
 import { Movie, Episode } from '@/types/movie';
@@ -19,11 +19,12 @@ import {
  * Separated to allow Suspense boundary for useSearchParams.
  */
 function WatchPageContent() {
-    const params = useParams();
     const router = useRouter();
     const searchParams = useSearchParams();
     const { user } = useAuth();
-    const id = params.id as string;
+
+    // Get ID from query param (?id=...) instead of path
+    const id = searchParams.get('id');
 
     const [movie, setMovie] = useState<Movie | null>(null);
     const [currentEpisode, setCurrentEpisode] = useState<Episode | null>(null);
@@ -43,6 +44,13 @@ function WatchPageContent() {
 
     useEffect(() => {
         async function fetchMovie() {
+            if (!id) {
+                // No ID provided in URL
+                setLoading(false);
+                setError(true);
+                return;
+            }
+
             try {
                 const data = await getMovieById(id);
                 if (!data) {

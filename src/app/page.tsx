@@ -149,7 +149,7 @@ export default function DashboardPage() {
               {continueWatchingItems.map(({ movie, episode }) => (
                 <Link
                   key={movie.id}
-                  href={`/watch/${movie.id}?episode=${episode.id}`}
+                  href={`/watch?id=${movie.id}&episode=${episode.id}`}
                   className="flex-shrink-0 w-64 sm:w-72 group"
                 >
                   <div className="relative rounded-xl overflow-hidden bg-zinc-800 shadow-lg transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl group-hover:shadow-purple-500/10">

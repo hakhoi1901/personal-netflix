@@ -17,7 +17,7 @@ export default function MovieCard({ movie }: MovieCardProps) {
             <div className="relative aspect-[2/3] rounded-xl overflow-hidden bg-zinc-800 shadow-lg transition-all duration-300 group-hover:scale-[1.03] group-hover:shadow-2xl group-hover:shadow-purple-500/10">
                 {/* Invisible overlay link — covers the entire card for watch navigation */}
                 <Link
-                    href={`/watch/${movie.id}`}
+                    href={`/watch?id=${movie.id}`}
                     className="absolute inset-0 z-[1]"
                     aria-label={`Watch ${movie.title}`}
                 />
@@ -48,7 +48,7 @@ export default function MovieCard({ movie }: MovieCardProps) {
 
                 {/* Edit Button — visible on hover, z-index above the overlay link */}
                 <Link
-                    href={`/admin/edit/${movie.id}`}
+                    href={`/admin/edit?id=${movie.id}`}
                     className="absolute top-3 right-3 p-2 bg-black/50 backdrop-blur-md rounded-lg text-zinc-300 hover:text-white hover:bg-black/70 opacity-0 group-hover:opacity-100 transition-all duration-200 z-10"
                     title="Edit"
                 >

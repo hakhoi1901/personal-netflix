@@ -1,20 +1,22 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { getMovieById, updateMovie } from '@/lib/firestore';
 import { Movie } from '@/types/movie';
 import { v4 as uuidv4 } from 'uuid';
 import MovieForm, { MovieFormData } from '@/components/admin/MovieForm';
+import { HiOutlineArrowLeft } from 'react-icons/hi2';
+import Link from 'next/link';
 
 /**
- * EditClient — Client component for the Edit Movie page.
- * Fetches movie data by ID and renders the reusable MovieForm in Edit mode.
+ * EditPageContent — The core logic.
+ * Separated to allow Suspense boundary.
  */
-export default function EditClient() {
-    const params = useParams();
-    const id = params.id as string;
+function EditPageContent() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const id = searchParams.get('id');
 
     const [movie, setMovie] = useState<Movie | null>(null);
     const [loading, setLoading] = useState(true);
@@ -23,6 +25,12 @@ export default function EditClient() {
 
     useEffect(() => {
         async function fetchMovie() {
+            if (!id) {
+                setLoading(false);
+                setNotFound(true);
+                return;
+            }
+
             try {
                 const data = await getMovieById(id);
                 if (!data) {
@@ -41,6 +49,7 @@ export default function EditClient() {
     }, [id]);
 
     const handleUpdate = async (data: MovieFormData) => {
+        if (!id) return;
         setSubmitting(true);
         try {
             const existingEpisodes = movie?.episodes ?? [];
@@ -62,7 +71,7 @@ export default function EditClient() {
                 episodes,
             });
 
-            router.push(`/watch/${id}`);
+            router.push(`/watch?id=${id}`);
         } catch (err) {
             console.error('Failed to update movie:', err);
             alert('Something went wrong. Please try again.');
@@ -105,10 +114,49 @@ export default function EditClient() {
     }
 
     return (
-        <MovieForm
-            initialData={movie}
-            onSubmit={handleUpdate}
-            submitting={submitting}
-        />
+        <div className="min-h-screen bg-zinc-950 pb-20">
+            {/* Header */}
+            <header className="sticky top-0 z-50 backdrop-blur-xl bg-zinc-950/80 border-b border-white/5 mb-8">
+                <div className="max-w-3xl mx-auto px-4 sm:px-6">
+                    <div className="flex items-center h-16 gap-4">
+                        <Link
+                            href="/"
+                            className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors"
+                        >
+                            <HiOutlineArrowLeft className="w-5 h-5" />
+                            <span className="text-sm font-medium">Back</span>
+                        </Link>
+                        <div className="h-5 w-px bg-white/10" />
+                        <h1 className="text-lg font-semibold text-white">Edit Movie</h1>
+                    </div>
+                </div>
+            </header>
+
+            <MovieForm
+                initialData={movie}
+                onSubmit={handleUpdate}
+                submitting={submitting}
+            />
+        </div>
+    );
+}
+
+/**
+ * EditClient — Suspense wrapper for proper static export support.
+ */
+export default function EditClient() {
+    return (
+        <Suspense
+            fallback={
+                <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+                    <div className="flex flex-col items-center gap-4">
+                        <div className="w-10 h-10 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                        <p className="text-zinc-400">Loading...</p>
+                    </div>
+                </div>
+            }
+        >
+            <EditPageContent />
+        </Suspense>
     );
 }
