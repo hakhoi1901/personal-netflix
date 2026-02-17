@@ -44,7 +44,7 @@ export default function LoginPage() {
                         <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-purple-500/25">
                             <HiOutlineFilm className="w-8 h-8 text-white" />
                         </div>
-                        <h1 className="text-2xl font-bold text-white">Theater</h1>
+                        <h1 className="text-2xl font-bold text-white">Horion</h1>
                         <p className="text-zinc-400 text-sm mt-1">Sign in to your personal cinema</p>
                     </div>
 

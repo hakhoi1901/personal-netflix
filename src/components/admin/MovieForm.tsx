@@ -1,18 +1,32 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm, useFieldArray, UseFormRegister, FieldErrors } from 'react-hook-form';
 import Link from 'next/link';
 import { Movie } from '@/types/movie';
 import * as XLSX from 'xlsx';
+import {
+    DndContext,
+    closestCenter,
+    KeyboardSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
+    DragEndEvent,
+} from '@dnd-kit/core';
+import {
+    SortableContext,
+    sortableKeyboardCoordinates,
+    useSortable,
+    verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import {
     HiOutlineArrowLeft,
     HiOutlinePlus,
     HiOutlineTrash,
     HiOutlineFilm,
     HiOutlineArrowUpTray,
-    HiOutlineChevronUp,
-    HiOutlineChevronDown,
     HiOutlineBarsArrowDown,
 } from 'react-icons/hi2';
 
@@ -35,6 +49,127 @@ interface MovieFormProps {
     initialData?: Movie;
     onSubmit: (data: MovieFormData) => Promise<void>;
     submitting: boolean;
+}
+
+/* ─── Sortable Episode Row ─────────────────────────────────────── */
+
+interface SortableEpisodeRowProps {
+    id: string;
+    index: number;
+    category: string;
+    episodeTitle: string;
+    register: UseFormRegister<MovieFormData>;
+    errors: FieldErrors<MovieFormData>;
+    onRemove: () => void;
+    disableRemove: boolean;
+}
+
+function SortableEpisodeRow({
+    id,
+    index,
+    category,
+    episodeTitle,
+    register,
+    errors,
+    onRemove,
+    disableRemove,
+}: SortableEpisodeRowProps) {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        zIndex: isDragging ? 50 : undefined,
+        opacity: isDragging ? 0.5 : 1,
+    };
+
+    return (
+        <div
+            ref={setNodeRef}
+            style={style}
+            className={`flex items-start gap-3 p-3 bg-white/[0.02] border rounded-xl group ${isDragging ? 'border-purple-500/40 shadow-lg shadow-purple-500/10' : 'border-white/5'
+                }`}
+        >
+            {/* Drag Handle (6 dots) */}
+            <button
+                type="button"
+                {...attributes}
+                {...listeners}
+                className="flex-shrink-0 w-8 h-8 flex items-center justify-center mt-0.5 cursor-grab active:cursor-grabbing text-zinc-600 hover:text-zinc-300 transition-colors touch-none"
+                title="Drag to reorder"
+            >
+                <svg width="14" height="18" viewBox="0 0 14 18" fill="currentColor">
+                    <circle cx="4" cy="3" r="1.5" />
+                    <circle cx="10" cy="3" r="1.5" />
+                    <circle cx="4" cy="9" r="1.5" />
+                    <circle cx="10" cy="9" r="1.5" />
+                    <circle cx="4" cy="15" r="1.5" />
+                    <circle cx="10" cy="15" r="1.5" />
+                </svg>
+            </button>
+
+            {/* Episode number indicator */}
+            <div className="flex-shrink-0 w-8 h-8 bg-white/5 rounded-lg flex items-center justify-center mt-0.5">
+                <span className="text-zinc-500 text-xs font-mono">{index + 1}</span>
+            </div>
+
+            {/* Episode Title */}
+            <div className="flex-1 min-w-0 group/ep relative">
+                <input
+                    {...register(`episodes.${index}.title` as const, {
+                        required: 'Episode title is required',
+                    })}
+                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
+                    placeholder={category === 'movie' ? 'Full Movie' : `Episode ${index + 1}`}
+                />
+                {episodeTitle && (
+                    <div className="absolute left-0 bottom-full mb-2 z-50 max-w-[280px] px-3 py-2 rounded-lg bg-zinc-800/95 backdrop-blur-sm border border-white/10 shadow-xl shadow-black/40 text-white text-xs font-medium leading-relaxed opacity-0 invisible group-hover/ep:opacity-100 group-hover/ep:visible transition-all duration-200 pointer-events-none whitespace-normal break-words">
+                        {episodeTitle}
+                        <div className="absolute -bottom-1 left-4 w-2 h-2 bg-zinc-800/95 border-r border-b border-white/10 rotate-45" />
+                    </div>
+                )}
+                {errors.episodes?.[index]?.title && (
+                    <p className="text-red-400 text-xs mt-1">
+                        {errors.episodes[index]?.title?.message}
+                    </p>
+                )}
+            </div>
+
+            {/* Drive ID */}
+            <div className="flex-1 min-w-0">
+                <input
+                    {...register(`episodes.${index}.driveId` as const, {
+                        required: 'Drive ID is required',
+                    })}
+                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all font-mono"
+                    placeholder="Google Drive File ID"
+                />
+                {errors.episodes?.[index]?.driveId && (
+                    <p className="text-red-400 text-xs mt-1">
+                        {errors.episodes[index]?.driveId?.message}
+                    </p>
+                )}
+            </div>
+
+            {/* Delete Button */}
+            <button
+                type="button"
+                onClick={onRemove}
+                disabled={disableRemove}
+                className="flex-shrink-0 p-2 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed mt-0.5"
+                title="Remove episode"
+            >
+                <HiOutlineTrash className="w-4 h-4" />
+            </button>
+        </div>
+    );
 }
 
 /**
@@ -67,7 +202,7 @@ export default function MovieForm({ initialData, onSubmit, submitting }: MovieFo
         formState: { errors },
     } = form;
 
-    const { fields, append, remove, swap } = useFieldArray({
+    const { fields, append, remove, move } = useFieldArray({
         control,
         name: 'episodes',
     });
@@ -146,6 +281,23 @@ export default function MovieForm({ initialData, onSubmit, submitting }: MovieFo
             a.title.localeCompare(b.title, 'vi', { numeric: true, sensitivity: 'base' })
         );
         setValue('episodes', sorted);
+    };
+
+    // dnd-kit sensors
+    const sensors = useSensors(
+        useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+    );
+
+    const handleDragEnd = (event: DragEndEvent) => {
+        const { active, over } = event;
+        if (over && active.id !== over.id) {
+            const oldIndex = fields.findIndex((f) => f.id === active.id);
+            const newIndex = fields.findIndex((f) => f.id === over.id);
+            if (oldIndex !== -1 && newIndex !== -1) {
+                move(oldIndex, newIndex);
+            }
+        }
     };
 
     // Populate form when initialData is provided (Edit mode)
@@ -356,83 +508,33 @@ export default function MovieForm({ initialData, onSubmit, submitting }: MovieFo
                             </div>
                         )}
 
-                        {/* Episode Rows */}
-                        <div className="space-y-3">
-                            {fields.map((field, index) => (
-                                <div
-                                    key={field.id}
-                                    className="flex items-start gap-3 p-3 bg-white/[0.02] border border-white/5 rounded-xl group"
-                                >
-                                    {/* Episode number indicator */}
-                                    <div className="flex-shrink-0 w-8 h-8 bg-white/5 rounded-lg flex items-center justify-center mt-0.5">
-                                        <span className="text-zinc-500 text-xs font-mono">{index + 1}</span>
-                                    </div>
-
-                                    {/* Episode Title */}
-                                    <div className="flex-1 min-w-0">
-                                        <input
-                                            {...register(`episodes.${index}.title` as const, {
-                                                required: 'Episode title is required',
-                                            })}
-                                            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
-                                            placeholder={category === 'movie' ? 'Full Movie' : `Episode ${index + 1}`}
+                        {/* Episode Rows — Drag & Drop */}
+                        <DndContext
+                            sensors={sensors}
+                            collisionDetection={closestCenter}
+                            onDragEnd={handleDragEnd}
+                        >
+                            <SortableContext
+                                items={fields.map((f) => f.id)}
+                                strategy={verticalListSortingStrategy}
+                            >
+                                <div className="space-y-3">
+                                    {fields.map((field, index) => (
+                                        <SortableEpisodeRow
+                                            key={field.id}
+                                            id={field.id}
+                                            index={index}
+                                            category={category}
+                                            episodeTitle={watch(`episodes.${index}.title`)}
+                                            register={register}
+                                            errors={errors}
+                                            onRemove={() => remove(index)}
+                                            disableRemove={fields.length <= 1}
                                         />
-                                        {errors.episodes?.[index]?.title && (
-                                            <p className="text-red-400 text-xs mt-1">
-                                                {errors.episodes[index]?.title?.message}
-                                            </p>
-                                        )}
-                                    </div>
-
-                                    {/* Drive ID */}
-                                    <div className="flex-1 min-w-0">
-                                        <input
-                                            {...register(`episodes.${index}.driveId` as const, {
-                                                required: 'Drive ID is required',
-                                            })}
-                                            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all font-mono"
-                                            placeholder="Google Drive File ID"
-                                        />
-                                        {errors.episodes?.[index]?.driveId && (
-                                            <p className="text-red-400 text-xs mt-1">
-                                                {errors.episodes[index]?.driveId?.message}
-                                            </p>
-                                        )}
-                                    </div>
-
-                                    {/* Reorder & Delete */}
-                                    <div className="flex flex-col gap-0.5 flex-shrink-0 mt-0.5">
-                                        <button
-                                            type="button"
-                                            onClick={() => swap(index, index - 1)}
-                                            disabled={index === 0}
-                                            className="p-1 text-zinc-500 hover:text-white hover:bg-white/10 rounded transition-all disabled:opacity-20 disabled:cursor-not-allowed"
-                                            title="Move up"
-                                        >
-                                            <HiOutlineChevronUp className="w-3.5 h-3.5" />
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => swap(index, index + 1)}
-                                            disabled={index === fields.length - 1}
-                                            className="p-1 text-zinc-500 hover:text-white hover:bg-white/10 rounded transition-all disabled:opacity-20 disabled:cursor-not-allowed"
-                                            title="Move down"
-                                        >
-                                            <HiOutlineChevronDown className="w-3.5 h-3.5" />
-                                        </button>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => remove(index)}
-                                        disabled={fields.length <= 1}
-                                        className="flex-shrink-0 p-2 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed mt-0.5"
-                                        title="Remove episode"
-                                    >
-                                        <HiOutlineTrash className="w-4 h-4" />
-                                    </button>
+                                    ))}
                                 </div>
-                            ))}
-                        </div>
+                            </SortableContext>
+                        </DndContext>
                     </section>
 
                     {/* Submit Button */}
