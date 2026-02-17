@@ -110,7 +110,7 @@ export default function DashboardPage() {
               <div className="w-9 h-9 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/20">
                 <HiOutlineFilm className="w-5 h-5 text-white" />
               </div>
-              <h1 className="text-xl font-bold text-white">Horion</h1>
+              <h1 className="text-xl font-bold text-white">Horitime</h1>
             </div>
 
             {/* Actions */}

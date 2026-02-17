@@ -11,7 +11,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Horion — Personal Cinema",
+  title: "Horitime — Personal Cinema",
   description: "Your personal movie and series streaming platform",
 };
 
