@@ -47,34 +47,38 @@ function WatchPageContent() {
     const [shuffleMode, setShuffleMode] = useState(false);
     const [shuffledEpisodes, setShuffledEpisodes] = useState<Episode[]>([]);
 
-    // Initialize current episode when movie data is available
+    // Initialize or Update current episode
     useEffect(() => {
-        if (movie) {
-            const sorted = [...movie.episodes].sort((a, b) => (a.order || 0) - (b.order || 0));
-            const resumeEpisodeId = searchParams.get('episode');
+        if (!movie) return;
 
-            // 1. If URL has specific episode, prefer it
-            if (resumeEpisodeId) {
-                if (currentEpisode?.id !== resumeEpisodeId) {
-                    const resumeEp = sorted.find((ep) => ep.id === resumeEpisodeId);
-                    if (resumeEp) {
-                        setCurrentEpisode(resumeEp);
-                    }
-                }
-            }
-            // 2. If no current episode OR current episode doesn't belong to this movie (stale state)
-            else {
-                const isCurrentValid = currentEpisode && movie.episodes.some(ep => ep.id === currentEpisode.id);
-                if (!isCurrentValid && sorted.length > 0) {
-                    setCurrentEpisode(sorted[0]);
-                }
-            }
+        // Ensure episodes are sorted
+        const sorted = [...movie.episodes].sort((a, b) => a.order - b.order);
+
+        // If no episodes, ensure currentEpisode is null
+        if (sorted.length === 0) {
+            setCurrentEpisode(null);
+            return;
         }
-    }, [movie, currentEpisode, searchParams]);
 
-    // Reset current episode when movie ID changes
+        // If we already have a selected episode that belongs to this movie, don't overwrite it
+        // (Unless we need to validate it exists, which is good practice)
+        if (currentEpisode && sorted.some(ep => ep.id === currentEpisode.id)) {
+            return;
+        }
+
+        // Otherwise, initialize (First load, or ID change, or invalid currentEpisode)
+        const resumeEpisodeId = searchParams.get('episode');
+        if (resumeEpisodeId) {
+            const resumeEp = sorted.find((ep) => ep.id === resumeEpisodeId);
+            setCurrentEpisode(resumeEp ?? sorted[0]);
+        } else {
+            setCurrentEpisode(sorted[0]);
+        }
+
+    }, [movie, searchParams, currentEpisode]); // kept currentEpisode to allow validation check
+
+    // Reset shuffle mode when ID changes
     useEffect(() => {
-        setCurrentEpisode(null);
         setShuffleMode(false);
     }, [id]);
 
