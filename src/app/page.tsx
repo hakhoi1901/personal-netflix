@@ -19,6 +19,7 @@ import {
   HiOutlinePlayCircle,
   HiOutlineXMark,
   HiOutlineSparkles,
+  HiOutlineUsers,
 } from 'react-icons/hi2';
 import PageTransition from '@/components/PageTransition';
 import Skeleton from '@/components/ui/Skeleton';
@@ -154,6 +155,16 @@ export default function DashboardPage() {
                 >
                   <HiOutlinePlus className="w-4 h-4" />
                   <span className="hidden sm:inline">Add Movie</span>
+                </Link>
+              )}
+
+              {can('canManageUsers') && (
+                <Link
+                  href="/admin/users"
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white text-sm font-medium rounded-xl transition-all duration-200 shadow-lg shadow-pink-500/20 hover:shadow-pink-500/30 active:scale-95"
+                >
+                  <HiOutlineUsers className="w-4 h-4" />
+                  <span className="hidden sm:inline">Users</span>
                 </Link>
               )}
 
