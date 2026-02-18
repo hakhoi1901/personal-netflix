@@ -7,13 +7,14 @@ import { motion } from 'framer-motion';
 interface MovieCardProps {
     movie: Movie;
     index?: number; // Added for staggered animation
+    isAdmin?: boolean; // Show edit button only for admins
 }
 
 /**
  * MovieCard displays a movie/series poster with title and category badge.
  * Uses an overlay link pattern to avoid nested <a> hydration errors.
  */
-export default function MovieCard({ movie, index = 0 }: MovieCardProps) {
+export default function MovieCard({ movie, index = 0, isAdmin = false }: MovieCardProps) {
     return (
         <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -54,14 +55,16 @@ export default function MovieCard({ movie, index = 0 }: MovieCardProps) {
                     </span>
                 </div>
 
-                {/* Edit Button — visible on hover, z-index above the overlay link */}
-                <Link
-                    href={`/admin/edit?id=${movie.id}`}
-                    className="absolute top-3 right-3 p-2 bg-black/50 backdrop-blur-md rounded-lg text-zinc-300 hover:text-white hover:bg-black/70 opacity-0 group-hover:opacity-100 transition-all duration-200 z-10 translate-y-2 group-hover:translate-y-0"
-                    title="Edit"
-                >
-                    <HiOutlinePencilSquare className="w-4 h-4" />
-                </Link>
+                {/* Edit Button — visible on hover, only for admins */}
+                {isAdmin && (
+                    <Link
+                        href={`/admin/edit?id=${movie.id}`}
+                        className="absolute top-3 right-3 p-2 bg-black/50 backdrop-blur-md rounded-lg text-zinc-300 hover:text-white hover:bg-black/70 opacity-0 group-hover:opacity-100 transition-all duration-200 z-10 translate-y-2 group-hover:translate-y-0"
+                        title="Edit"
+                    >
+                        <HiOutlinePencilSquare className="w-4 h-4" />
+                    </Link>
+                )}
 
                 {/* Episode count for series */}
                 {movie.category === 'series' && (

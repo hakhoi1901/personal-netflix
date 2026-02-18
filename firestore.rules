@@ -1,0 +1,51 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper function: Check if the calling user is an admin
+    // by reading their document from the 'users' collection.
+    function isAdmin() {
+      return request.auth != null
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // --- USERS COLLECTION ---
+    match /users/{userId} {
+      // A user can only read their own profile
+      allow read: if request.auth != null && request.auth.uid == userId;
+
+      // A user can create their own profile document on first login,
+      // but CANNOT self-assign the 'admin' role.
+      allow create: if request.auth != null
+                    && request.auth.uid == userId
+                    && request.resource.data.role == 'user';
+
+      // A user can update their own profile, but CANNOT change their role
+      // (prevents privilege escalation attacks).
+      allow update: if request.auth != null
+                    && request.auth.uid == userId
+                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']);
+
+      // Only admins can delete user documents or update roles
+      allow delete: if isAdmin();
+    }
+
+    // --- MOVIES COLLECTION ---
+    match /movies/{movieId} {
+      // Anyone authenticated can read movies
+      allow read: if request.auth != null;
+
+      // Only admins can create, update, or delete movies
+      allow write: if isAdmin();
+    }
+
+    // --- WATCH PROGRESS COLLECTION ---
+    // Users can only read/write their own watch progress
+    match /watchProgress/{progressId} {
+      allow read, write: if request.auth != null
+                         && request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null
+                    && request.auth.uid == request.resource.data.userId;
+    }
+  }
+}

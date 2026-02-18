@@ -145,13 +145,15 @@ export default function DashboardPage() {
                 <span className="hidden sm:inline">Surprise Me</span>
               </button>
 
-              <Link
-                href="/admin/add"
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-sm font-medium rounded-xl transition-all duration-200 shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30 active:scale-95"
-              >
-                <HiOutlinePlus className="w-4 h-4" />
-                <span className="hidden sm:inline">Add Movie</span>
-              </Link>
+              {user?.role === 'admin' && (
+                <Link
+                  href="/admin/add"
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-sm font-medium rounded-xl transition-all duration-200 shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30 active:scale-95"
+                >
+                  <HiOutlinePlus className="w-4 h-4" />
+                  <span className="hidden sm:inline">Add Movie</span>
+                </Link>
+              )}
 
               <button
                 onClick={handleSignOut}
@@ -302,14 +304,18 @@ export default function DashboardPage() {
             </div>
             <h3 className="text-xl font-semibold text-zinc-300 mb-2">No movies yet</h3>
             <p className="text-zinc-500 max-w-sm mb-6">
-              Start building your personal cinema by adding your first movie or series.
+              {user?.role === 'admin'
+                ? 'Start building your personal cinema by adding your first movie or series.'
+                : 'No content available yet. Check back later!'}
             </p>
-            <Link
-              href="/admin/add"
-              className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-medium rounded-xl transition-all shadow-lg shadow-purple-500/20"
-            >
-              Add Your First Movie
-            </Link>
+            {user?.role === 'admin' && (
+              <Link
+                href="/admin/add"
+                className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-medium rounded-xl transition-all shadow-lg shadow-purple-500/20"
+              >
+                Add Your First Movie
+              </Link>
+            )}
           </div>
         )}
 
@@ -328,7 +334,7 @@ export default function DashboardPage() {
         {!loading && filteredMovies.length > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6">
             {filteredMovies.map((movie, index) => (
-              <MovieCard key={movie.id} movie={movie} index={index} />
+              <MovieCard key={movie.id} movie={movie} index={index} isAdmin={user?.role === 'admin'} />
             ))}
           </div>
         )}
