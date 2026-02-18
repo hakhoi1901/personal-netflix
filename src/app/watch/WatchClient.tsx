@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getMovieById, saveWatchProgress } from '@/lib/firestore';
 import { useAuth } from '@/context/AuthContext';
+import { usePermission } from '@/hooks/usePermission';
 import { Movie, Episode } from '@/types/movie';
 import DrivePlayer from '@/components/DrivePlayer';
 import EpisodeList from '@/components/EpisodeList';
@@ -15,6 +16,7 @@ import {
     HiOutlineForward,
     HiOutlineArrowPath,
     HiOutlineArrowsRightLeft,
+    HiOutlineLockClosed,
 } from 'react-icons/hi2';
 
 /**
@@ -25,6 +27,7 @@ function WatchPageContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { user } = useAuth();
+    const { can } = usePermission();
     const id = searchParams.get('id');
 
     const {
@@ -182,6 +185,32 @@ function WatchPageContent() {
                     <Link
                         href="/"
                         className="mt-2 px-6 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-medium rounded-xl transition-all"
+                    >
+                        Back to Library
+                    </Link>
+                </div>
+            </div>
+        );
+    }
+
+    // VIP content gate: block non-VIP users from watching VIP movies
+    if (movie.isVip && !can('canWatchVipContent')) {
+        return (
+            <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+                <div className="flex flex-col items-center gap-5 text-center px-6 max-w-sm">
+                    <div className="w-20 h-20 bg-amber-500/10 rounded-2xl flex items-center justify-center border border-amber-500/20">
+                        <HiOutlineLockClosed className="w-10 h-10 text-amber-400" />
+                    </div>
+                    <div>
+                        <p className="text-amber-400 text-sm font-semibold tracking-wide uppercase mb-2">👑 VIP Content</p>
+                        <h2 className="text-xl font-bold text-white mb-2">{movie.title}</h2>
+                        <p className="text-zinc-400 text-sm leading-relaxed">
+                            This content is exclusive to VIP members. Upgrade your account to watch.
+                        </p>
+                    </div>
+                    <Link
+                        href="/"
+                        className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-medium rounded-xl transition-all"
                     >
                         Back to Library
                     </Link>

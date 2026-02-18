@@ -104,6 +104,7 @@ export async function addMovie(
     const payload: Record<string, unknown> = {
         ...data,
         episodes: sortedEpisodes,
+        isVip: data.isVip ?? false,
         createdAt: now,
         updatedAt: now,
     };

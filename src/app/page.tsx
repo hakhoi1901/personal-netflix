@@ -7,6 +7,7 @@ import MovieCard from '@/components/MovieCard';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/context/AuthContext';
+import { usePermission } from '@/hooks/usePermission';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/firebase/config';
 import { useRouter } from 'next/navigation';
@@ -37,6 +38,7 @@ export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<FilterTab>('all');
   const [surpriseLoading, setSurpriseLoading] = useState(false);
   const { user } = useAuth();
+  const { can } = usePermission();
   const router = useRouter();
 
   useEffect(() => {
@@ -145,7 +147,7 @@ export default function DashboardPage() {
                 <span className="hidden sm:inline">Surprise Me</span>
               </button>
 
-              {user?.role === 'admin' && (
+              {can('canCreateMovie') && (
                 <Link
                   href="/admin/add"
                   className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-sm font-medium rounded-xl transition-all duration-200 shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30 active:scale-95"
@@ -304,11 +306,11 @@ export default function DashboardPage() {
             </div>
             <h3 className="text-xl font-semibold text-zinc-300 mb-2">No movies yet</h3>
             <p className="text-zinc-500 max-w-sm mb-6">
-              {user?.role === 'admin'
+              {can('canCreateMovie')
                 ? 'Start building your personal cinema by adding your first movie or series.'
                 : 'No content available yet. Check back later!'}
             </p>
-            {user?.role === 'admin' && (
+            {can('canCreateMovie') && (
               <Link
                 href="/admin/add"
                 className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-medium rounded-xl transition-all shadow-lg shadow-purple-500/20"
@@ -334,7 +336,7 @@ export default function DashboardPage() {
         {!loading && filteredMovies.length > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6">
             {filteredMovies.map((movie, index) => (
-              <MovieCard key={movie.id} movie={movie} index={index} isAdmin={user?.role === 'admin'} />
+              <MovieCard key={movie.id} movie={movie} index={index} isAdmin={can('canUpdateMovie')} />
             ))}
           </div>
         )}

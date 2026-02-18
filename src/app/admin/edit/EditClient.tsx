@@ -68,6 +68,7 @@ function EditPageContent() {
                 description: data.description || undefined,
                 category: data.category,
                 isCompleted: data.isCompleted,
+                isVip: data.isVip,
                 episodes,
             });
 

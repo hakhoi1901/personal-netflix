@@ -1,14 +1,13 @@
-import RoleGuard from '@/components/auth/RoleGuard';
+import PermissionGuard from '@/components/auth/PermissionGuard';
 
 /**
- * Admin Layout — wraps all routes under /admin with a RoleGuard.
- * Only users with the 'admin' role can access these pages.
- * Everyone else is redirected to the homepage.
+ * Admin Layout — protects all /admin/* routes.
+ * Requires canViewAdminPanel permission. All other users are redirected to /.
  */
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
     return (
-        <RoleGuard allowedRoles={['admin']}>
+        <PermissionGuard require="canViewAdminPanel">
             {children}
-        </RoleGuard>
+        </PermissionGuard>
     );
 }

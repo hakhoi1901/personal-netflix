@@ -42,6 +42,7 @@ export interface MovieFormData {
     description: string;
     category: 'movie' | 'series';
     isCompleted: boolean;
+    isVip: boolean;
     episodes: EpisodeInput[];
 }
 
@@ -187,6 +188,7 @@ export default function MovieForm({ initialData, onSubmit, submitting }: MovieFo
             description: '',
             category: 'movie',
             isCompleted: true,
+            isVip: false,
             episodes: [{ title: 'Full Movie', driveId: '' }],
         },
     });
@@ -310,6 +312,7 @@ export default function MovieForm({ initialData, onSubmit, submitting }: MovieFo
                 description: initialData.description ?? '',
                 category: initialData.category,
                 isCompleted: initialData.isCompleted,
+                isVip: initialData.isVip ?? false,
                 episodes: initialData.episodes
                     .sort((a, b) => a.order - b.order)
                     .map((ep) => ({
@@ -412,7 +415,7 @@ export default function MovieForm({ initialData, onSubmit, submitting }: MovieFo
                             />
                         </div>
 
-                        {/* Category & Status */}
+                        {/* Category & Status & VIP */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <label htmlFor="category" className="block text-sm font-medium text-zinc-300 mb-2">
@@ -441,6 +444,25 @@ export default function MovieForm({ initialData, onSubmit, submitting }: MovieFo
                                     <option value="false" className="bg-zinc-900">Ongoing</option>
                                 </select>
                             </div>
+                        </div>
+
+                        {/* VIP Toggle */}
+                        <div className="flex items-center justify-between p-4 bg-amber-500/5 border border-amber-500/20 rounded-xl">
+                            <div className="flex items-center gap-3">
+                                <span className="text-xl">👑</span>
+                                <div>
+                                    <p className="text-sm font-medium text-zinc-200">VIP Content</p>
+                                    <p className="text-xs text-zinc-500 mt-0.5">Only VIP, Editor & Admin can watch</p>
+                                </div>
+                            </div>
+                            <label className="relative inline-flex items-center cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    {...register('isVip')}
+                                    className="sr-only peer"
+                                />
+                                <div className="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                            </label>
                         </div>
                     </section>
 

@@ -10,7 +10,8 @@ import {
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '@/firebase/config';
-import { AppUser } from '@/types/user';
+import { AppUser, UserRole } from '@/types/user';
+import { getPermissionsByRole } from '@/lib/permissions';
 
 interface AuthContextType {
     user: AppUser | null;
@@ -23,9 +24,12 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 /**
- * AuthProvider wraps the app and listens to Firebase auth state changes.
- * After auth resolves, it fetches the user's role from Firestore.
- * The `loading` flag stays true until BOTH auth AND the role fetch are complete.
+ * AuthProvider listens to Firebase auth state changes.
+ * After auth resolves, it fetches the user's role + permissions from Firestore.
+ * `loading` stays true until BOTH auth AND Firestore fetch are complete.
+ *
+ * Denormalized permissions are stored directly on the user document,
+ * so we never need to re-derive them from the role at runtime.
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<AppUser | null>(null);
@@ -39,23 +43,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     const userSnap = await getDoc(userRef);
 
                     if (userSnap.exists()) {
-                        // Existing user: read their role from Firestore
-                        const userData = userSnap.data();
-                        setUser({ ...firebaseUser, role: userData.role ?? 'user' } as AppUser);
+                        // Existing user: read role + permissions from Firestore
+                        const data = userSnap.data();
+                        const role = (data.role ?? 'user') as UserRole;
+                        // Use stored permissions, but fall back to role-derived ones
+                        // in case the document is missing the permissions field
+                        const permissions = data.permissions ?? getPermissionsByRole(role);
+                        setUser({ ...firebaseUser, role, permissions } as AppUser);
                     } else {
-                        // Brand new user: create a Firestore document with default role
+                        // Brand new user: create document with default 'user' role
+                        const defaultRole: UserRole = 'user';
+                        const defaultPermissions = getPermissionsByRole(defaultRole);
                         const newUserData = {
                             email: firebaseUser.email,
-                            role: 'user' as const,
+                            role: defaultRole,
+                            permissions: defaultPermissions,
                             createdAt: serverTimestamp(),
                         };
                         await setDoc(userRef, newUserData);
-                        setUser({ ...firebaseUser, role: 'user' } as AppUser);
+                        setUser({
+                            ...firebaseUser,
+                            role: defaultRole,
+                            permissions: defaultPermissions,
+                        } as AppUser);
                     }
                 } catch (err) {
-                    // If Firestore fails (e.g. offline), default to 'user' role
-                    console.error('Failed to fetch user role from Firestore:', err);
-                    setUser({ ...firebaseUser, role: 'user' } as AppUser);
+                    // Firestore unavailable (offline/network error): default to 'user'
+                    console.error('Failed to fetch user data from Firestore:', err);
+                    setUser({
+                        ...firebaseUser,
+                        role: 'user',
+                        permissions: getPermissionsByRole('user'),
+                    } as AppUser);
                 }
             } else {
                 setUser(null);
@@ -63,11 +82,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setLoading(false);
         });
 
-        // Safety timeout: if Firebase auth never responds (network issues on mobile),
-        // stop loading after 5 seconds so the app can redirect to login
-        const timeout = setTimeout(() => {
-            setLoading(false);
-        }, 5000);
+        // Safety timeout: stop loading after 5s if Firebase never responds
+        const timeout = setTimeout(() => setLoading(false), 5000);
 
         return () => {
             unsubscribe();
@@ -83,7 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 }
 
 /**
- * Hook to access the current auth state (user + role) from any component.
+ * Hook to access the current auth state (user + role + permissions).
  */
 export function useAuth() {
     return useContext(AuthContext);

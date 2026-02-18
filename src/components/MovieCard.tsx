@@ -43,8 +43,8 @@ export default function MovieCard({ movie, index = 0, isAdmin = false }: MovieCa
                 {/* Gradient overlay for text readability */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-80 group-hover:opacity-100 transition-opacity duration-300" />
 
-                {/* Category Badge */}
-                <div className="absolute top-3 left-3">
+                {/* Category Badge + VIP Badge */}
+                <div className="absolute top-3 left-3 flex flex-col gap-1.5">
                     <span
                         className={`px-2.5 py-1 text-xs font-semibold rounded-lg backdrop-blur-md shadow-sm ${movie.category === 'series'
                             ? 'bg-indigo-500/90 text-white'
@@ -53,6 +53,11 @@ export default function MovieCard({ movie, index = 0, isAdmin = false }: MovieCa
                     >
                         {movie.category === 'series' ? 'Series' : 'Movie'}
                     </span>
+                    {movie.isVip && (
+                        <span className="px-2.5 py-1 text-xs font-bold rounded-lg backdrop-blur-md shadow-sm bg-amber-500/90 text-white flex items-center gap-1">
+                            👑 VIP
+                        </span>
+                    )}
                 </div>
 
                 {/* Edit Button — visible on hover, only for admins */}
