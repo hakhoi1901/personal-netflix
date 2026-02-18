@@ -49,15 +49,25 @@ function WatchPageContent() {
 
     // Initialize current episode when movie data is available
     useEffect(() => {
-        if (movie && !currentEpisode) {
-            const sorted = [...movie.episodes].sort((a, b) => a.order - b.order);
+        if (movie) {
+            const sorted = [...movie.episodes].sort((a, b) => (a.order || 0) - (b.order || 0));
             const resumeEpisodeId = searchParams.get('episode');
 
+            // 1. If URL has specific episode, prefer it
             if (resumeEpisodeId) {
-                const resumeEp = sorted.find((ep) => ep.id === resumeEpisodeId);
-                setCurrentEpisode(resumeEp ?? sorted[0] ?? null);
-            } else if (sorted.length > 0) {
-                setCurrentEpisode(sorted[0]);
+                if (currentEpisode?.id !== resumeEpisodeId) {
+                    const resumeEp = sorted.find((ep) => ep.id === resumeEpisodeId);
+                    if (resumeEp) {
+                        setCurrentEpisode(resumeEp);
+                    }
+                }
+            }
+            // 2. If no current episode OR current episode doesn't belong to this movie (stale state)
+            else {
+                const isCurrentValid = currentEpisode && movie.episodes.some(ep => ep.id === currentEpisode.id);
+                if (!isCurrentValid && sorted.length > 0) {
+                    setCurrentEpisode(sorted[0]);
+                }
             }
         }
     }, [movie, currentEpisode, searchParams]);
