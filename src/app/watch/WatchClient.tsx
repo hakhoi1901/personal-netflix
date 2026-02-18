@@ -13,6 +13,8 @@ import {
     HiOutlineArrowLeft,
     HiOutlineFilm,
     HiOutlineForward,
+    HiOutlineArrowPath,
+    HiOutlineArrowsRightLeft,
 } from 'react-icons/hi2';
 
 /**
@@ -42,6 +44,8 @@ function WatchPageContent() {
     });
 
     const [currentEpisode, setCurrentEpisode] = useState<Episode | null>(null);
+    const [shuffleMode, setShuffleMode] = useState(false);
+    const [shuffledEpisodes, setShuffledEpisodes] = useState<Episode[]>([]);
 
     // Initialize current episode when movie data is available
     useEffect(() => {
@@ -61,18 +65,51 @@ function WatchPageContent() {
     // Reset current episode when movie ID changes
     useEffect(() => {
         setCurrentEpisode(null);
+        setShuffleMode(false);
     }, [id]);
 
     const sortedEpisodes = movie
         ? [...movie.episodes].sort((a, b) => a.order - b.order)
         : [];
 
+    // Fisher-Yates shuffle
+    const shuffleArray = useCallback((arr: Episode[]): Episode[] => {
+        const a = [...arr];
+        for (let i = a.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [a[i], a[j]] = [a[j], a[i]];
+        }
+        return a;
+    }, []);
+
+    const toggleShuffleMode = useCallback(() => {
+        setShuffleMode((prev) => {
+            if (!prev) {
+                // Turning ON — generate a new shuffled order
+                setShuffledEpisodes(shuffleArray(sortedEpisodes));
+            }
+            return !prev;
+        });
+    }, [shuffleArray, sortedEpisodes]);
+
+    const handleRandomEpisode = useCallback(() => {
+        if (sortedEpisodes.length <= 1) return;
+        const others = sortedEpisodes.filter((ep) => ep.id !== currentEpisode?.id);
+        const randomEp = others[Math.floor(Math.random() * others.length)];
+        setCurrentEpisode(randomEp);
+        saveProgress(randomEp);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [sortedEpisodes, currentEpisode]);
+
+    // The active episode queue (shuffled or sorted)
+    const activeQueue = shuffleMode ? shuffledEpisodes : sortedEpisodes;
+
     const currentIndex = currentEpisode
-        ? sortedEpisodes.findIndex((ep) => ep.id === currentEpisode.id)
+        ? activeQueue.findIndex((ep) => ep.id === currentEpisode.id)
         : -1;
 
-    const hasNextEpisode = currentIndex >= 0 && currentIndex < sortedEpisodes.length - 1;
-    const nextEpisode = hasNextEpisode ? sortedEpisodes[currentIndex + 1] : null;
+    const hasNextEpisode = currentIndex >= 0 && currentIndex < activeQueue.length - 1;
+    const nextEpisode = hasNextEpisode ? activeQueue[currentIndex + 1] : null;
 
     const saveProgress = useCallback(
         async (episode: Episode) => {
@@ -152,12 +189,40 @@ function WatchPageContent() {
                             <span className="text-sm font-medium">Library</span>
                         </Link>
                         <div className="h-5 w-px bg-white/10" />
-                        <h1 className="text-sm font-medium text-white truncate">{movie.title}</h1>
+                        <h1 className="text-sm font-medium text-white truncate flex-1 min-w-0">{movie.title}</h1>
                         {currentEpisode && movie.category === 'series' && (
                             <>
                                 <div className="h-5 w-px bg-white/10" />
                                 <span className="text-sm text-zinc-400 truncate">{currentEpisode.title}</span>
                             </>
+                        )}
+
+                        {/* Episode controls — only for series with multiple episodes */}
+                        {movie.episodes.length > 1 && (
+                            <div className="ml-auto flex items-center gap-1.5 flex-shrink-0">
+                                {/* Random Episode */}
+                                <button
+                                    onClick={handleRandomEpisode}
+                                    title="Random Episode"
+                                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-zinc-400 hover:text-white hover:bg-white/10 rounded-lg transition-all text-xs font-medium"
+                                >
+                                    <HiOutlineArrowPath className="w-4 h-4" />
+                                    <span className="hidden sm:inline">Random</span>
+                                </button>
+
+                                {/* Shuffle Mode */}
+                                <button
+                                    onClick={toggleShuffleMode}
+                                    title={shuffleMode ? 'Shuffle: ON' : 'Shuffle: OFF'}
+                                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all text-xs font-medium ${shuffleMode
+                                        ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+                                        : 'text-zinc-400 hover:text-white hover:bg-white/10'
+                                        }`}
+                                >
+                                    <HiOutlineArrowsRightLeft className="w-4 h-4" />
+                                    <span className="hidden sm:inline">Shuffle</span>
+                                </button>
+                            </div>
                         )}
                     </div>
                 </div>
@@ -231,7 +296,7 @@ function WatchPageContent() {
                         <div className="lg:w-80 xl:w-96 border-t lg:border-t-0 lg:border-l border-white/5 bg-zinc-900/30">
                             <div className="lg:sticky lg:top-14 lg:h-[calc(100vh-3.5rem)]">
                                 <EpisodeList
-                                    episodes={movie.episodes}
+                                    episodes={shuffleMode ? shuffledEpisodes : movie.episodes}
                                     currentEpisodeId={currentEpisode.id}
                                     onSelect={handleEpisodeChange}
                                     movieTitle={movie.title}

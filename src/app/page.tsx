@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { getAllMovies, getUserProgress, WatchProgress } from '@/lib/firestore';
 import { Movie } from '@/types/movie';
 import MovieCard from '@/components/MovieCard';
@@ -9,6 +9,7 @@ import Image from 'next/image';
 import { useAuth } from '@/context/AuthContext';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/firebase/config';
+import { useRouter } from 'next/navigation';
 import {
   HiOutlinePlus,
   HiOutlineFilm,
@@ -16,6 +17,7 @@ import {
   HiOutlineMagnifyingGlass,
   HiOutlinePlayCircle,
   HiOutlineXMark,
+  HiOutlineSparkles,
 } from 'react-icons/hi2';
 
 type FilterTab = 'all' | 'movie' | 'series';
@@ -30,7 +32,9 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<FilterTab>('all');
+  const [surpriseLoading, setSurpriseLoading] = useState(false);
   const { user } = useAuth();
+  const router = useRouter();
 
   useEffect(() => {
     async function fetchData() {
@@ -53,6 +57,13 @@ export default function DashboardPage() {
   const handleSignOut = async () => {
     await signOut(auth);
   };
+
+  const handleSurpriseMe = useCallback(() => {
+    if (movies.length === 0) return;
+    setSurpriseLoading(true);
+    const randomMovie = movies[Math.floor(Math.random() * movies.length)];
+    router.push(`/watch?id=${randomMovie.id}`);
+  }, [movies, router]);
 
   // --- Filtered movies ---
   const filteredMovies = useMemo(() => {
@@ -115,6 +126,17 @@ export default function DashboardPage() {
 
             {/* Actions */}
             <div className="flex items-center gap-3">
+              {/* Surprise Me */}
+              <button
+                onClick={handleSurpriseMe}
+                disabled={movies.length === 0 || surpriseLoading}
+                title="Surprise Me — random movie"
+                className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-zinc-300 hover:text-white text-sm font-medium rounded-xl transition-all duration-200 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <HiOutlineSparkles className={`w-4 h-4 ${surpriseLoading ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">Surprise Me</span>
+              </button>
+
               <Link
                 href="/admin/add"
                 className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-sm font-medium rounded-xl transition-all duration-200 shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30 active:scale-95"
