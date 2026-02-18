@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useEffect, useState, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getMovieById, saveWatchProgress } from '@/lib/firestore';
 import { useAuth } from '@/context/AuthContext';
@@ -22,14 +23,45 @@ function WatchPageContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { user } = useAuth();
-
-    // Get ID from query param (?id=...) instead of path
     const id = searchParams.get('id');
 
-    const [movie, setMovie] = useState<Movie | null>(null);
+    const {
+        data: movie,
+        isLoading,
+        isError
+    } = useQuery({
+        queryKey: ['movie', id],
+        queryFn: async () => {
+            if (!id) throw new Error('No ID provided');
+            const data = await getMovieById(id);
+            if (!data) throw new Error('Movie not found');
+            return data;
+        },
+        enabled: !!id,
+        staleTime: 5 * 60 * 1000, // 5 minutes
+    });
+
     const [currentEpisode, setCurrentEpisode] = useState<Episode | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(false);
+
+    // Initialize current episode when movie data is available
+    useEffect(() => {
+        if (movie && !currentEpisode) {
+            const sorted = [...movie.episodes].sort((a, b) => a.order - b.order);
+            const resumeEpisodeId = searchParams.get('episode');
+
+            if (resumeEpisodeId) {
+                const resumeEp = sorted.find((ep) => ep.id === resumeEpisodeId);
+                setCurrentEpisode(resumeEp ?? sorted[0] ?? null);
+            } else if (sorted.length > 0) {
+                setCurrentEpisode(sorted[0]);
+            }
+        }
+    }, [movie, currentEpisode, searchParams]);
+
+    // Reset current episode when movie ID changes
+    useEffect(() => {
+        setCurrentEpisode(null);
+    }, [id]);
 
     const sortedEpisodes = movie
         ? [...movie.episodes].sort((a, b) => a.order - b.order)
@@ -41,42 +73,6 @@ function WatchPageContent() {
 
     const hasNextEpisode = currentIndex >= 0 && currentIndex < sortedEpisodes.length - 1;
     const nextEpisode = hasNextEpisode ? sortedEpisodes[currentIndex + 1] : null;
-
-    useEffect(() => {
-        async function fetchMovie() {
-            if (!id) {
-                // No ID provided in URL
-                setLoading(false);
-                setError(true);
-                return;
-            }
-
-            try {
-                const data = await getMovieById(id);
-                if (!data) {
-                    setError(true);
-                    return;
-                }
-                setMovie(data);
-
-                const resumeEpisodeId = searchParams.get('episode');
-                const sorted = [...data.episodes].sort((a, b) => a.order - b.order);
-
-                if (resumeEpisodeId) {
-                    const resumeEp = sorted.find((ep) => ep.id === resumeEpisodeId);
-                    setCurrentEpisode(resumeEp ?? sorted[0] ?? null);
-                } else if (sorted.length > 0) {
-                    setCurrentEpisode(sorted[0]);
-                }
-            } catch (err) {
-                console.error('Failed to fetch movie:', err);
-                setError(true);
-            } finally {
-                setLoading(false);
-            }
-        }
-        fetchMovie();
-    }, [id, searchParams]);
 
     const saveProgress = useCallback(
         async (episode: Episode) => {
@@ -112,7 +108,7 @@ function WatchPageContent() {
         }
     };
 
-    if (loading) {
+    if (isLoading) {
         return (
             <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
                 <div className="flex flex-col items-center gap-4">
@@ -123,7 +119,7 @@ function WatchPageContent() {
         );
     }
 
-    if (error || !movie) {
+    if (isError || !movie) {
         return (
             <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
                 <div className="flex flex-col items-center gap-4 text-center px-4">

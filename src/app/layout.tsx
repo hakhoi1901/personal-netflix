@@ -4,6 +4,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import AuthGuard from "@/components/AuthGuard";
+import Providers from "@/components/Providers";
 
 const inter = Inter({
   variable: "--font-geist-sans",
@@ -36,7 +37,9 @@ export default function RootLayout({
       </head>
       <body className={`${inter.variable} antialiased bg-zinc-950 text-white`} suppressHydrationWarning>
         <AuthProvider>
-          <AuthGuard>{children}</AuthGuard>
+          <AuthGuard>
+            <Providers>{children}</Providers>
+          </AuthGuard>
         </AuthProvider>
       </body>
     </html>
