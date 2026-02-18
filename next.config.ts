@@ -13,6 +13,12 @@ const nextConfig: NextConfig = {
   images: {
     // Image Optimization requires a Node.js server — unavailable in APK
     unoptimized: true,
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "**",
+      },
+    ],
   },
 };
 
