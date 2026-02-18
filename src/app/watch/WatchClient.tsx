@@ -246,7 +246,17 @@ function WatchPageContent() {
                 <div className="flex flex-col lg:flex-row">
                     <div className="flex-1 p-4 sm:p-6">
                         {currentEpisode ? (
-                            <DrivePlayer driveId={currentEpisode.driveId} />
+                            <div className="space-y-4">
+                                <DrivePlayer driveId={currentEpisode.driveId} />
+                                <div className="flex flex-col gap-1">
+                                    <h1 className="text-2xl font-bold text-white leading-tight">
+                                        {currentEpisode.title}
+                                    </h1>
+                                    <p className="text-zinc-400 text-sm">
+                                        Episode {currentEpisode.order}
+                                    </p>
+                                </div>
+                            </div>
                         ) : (
                             <div className="aspect-video bg-zinc-900 rounded-xl flex items-center justify-center">
                                 <p className="text-zinc-500">No episodes available</p>
@@ -273,9 +283,9 @@ function WatchPageContent() {
                             </button>
                         )}
 
-                        <div className="mt-6">
-                            <h2 className="text-xl font-bold text-white">{movie.title}</h2>
-                            <div className="flex items-center gap-3 mt-2">
+                        <div className="mt-8 pt-8 border-t border-white/5">
+                            <h2 className="text-lg font-semibold text-zinc-200 mb-2">About {movie.title}</h2>
+                            <div className="flex items-center gap-3 mb-4">
                                 <span
                                     className={`px-2.5 py-1 text-xs font-semibold rounded-lg ${movie.category === 'series'
                                         ? 'bg-indigo-500/20 text-indigo-400'
@@ -299,7 +309,7 @@ function WatchPageContent() {
                                 )}
                             </div>
                             {movie.description && (
-                                <p className="text-zinc-400 mt-4 text-sm leading-relaxed max-w-3xl">
+                                <p className="text-zinc-400 text-sm leading-relaxed max-w-3xl">
                                     {movie.description}
                                 </p>
                             )}
@@ -313,7 +323,7 @@ function WatchPageContent() {
                                     episodes={shuffleMode ? shuffledEpisodes : movie.episodes}
                                     currentEpisodeId={currentEpisode.id}
                                     onSelect={handleEpisodeChange}
-                                    movieTitle={movie.title}
+                                    movieTitle="Episodes" // Changed from movie.title
                                 />
                             </div>
                         </div>
