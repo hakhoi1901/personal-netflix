@@ -171,27 +171,24 @@ export default function DrivePlayer({ driveId }: DrivePlayerProps) {
             )}
 
             {/* Touch Zones for Double Tap (Mobile/Tablet) */}
-            <div className="absolute inset-0 flex z-10 pointer-events-none">
+            <div className="absolute inset-x-0 top-0 bottom-24 flex z-10 pointer-events-none">
                 {/* Left Zone - Rewind */}
                 <div
-                    className="w-1/3 h-full pointer-events-auto"
+                    className="w-1/3 h-full pointer-events-auto md:pointer-events-none"
                     onTouchEnd={(e) => {
-                        // Prevent default if it's a double tap to avoid zooming
                         handleTouch('left');
                     }}
-                    onClick={() => handleTouch('left')} // Fallback for desktop testing
                 />
 
-                {/* Center Zone - Play/Pause (optional, usually handled by native controls or click) */}
+                {/* Center Zone */}
                 <div className="w-1/3 h-full pointer-events-none" />
 
                 {/* Right Zone - Forward */}
                 <div
-                    className="w-1/3 h-full pointer-events-auto"
+                    className="w-1/3 h-full pointer-events-auto md:pointer-events-none"
                     onTouchEnd={(e) => {
                         handleTouch('right');
                     }}
-                    onClick={() => handleTouch('right')} // Fallback for desktop testing
                 />
             </div>
 
@@ -217,7 +214,7 @@ export default function DrivePlayer({ driveId }: DrivePlayerProps) {
                 </div>
             )}
 
-            {/* Custom Styles for Animation and Touch Zones */}
+            {/* Custom Styles for Animation */}
             <style jsx>{`
                 @keyframes ping-once {
                     0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0; }
@@ -226,13 +223,6 @@ export default function DrivePlayer({ driveId }: DrivePlayerProps) {
                 }
                 .animate-ping-once {
                     animation: ping-once 0.6s ease-out forwards;
-                }
-                
-                /* Enable touch zones only on touch devices */
-                @media (hover: none) and (pointer: coarse) {
-                    .touch-zone {
-                        pointer-events: auto;
-                    }
                 }
             `}</style>
         </div>
