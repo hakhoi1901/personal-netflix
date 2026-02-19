@@ -10,7 +10,9 @@ import {
     HiOutlineChevronRight,
     HiOutlinePencilSquare,
     HiOutlineUser,
+    HiOutlineArrowLeft,
 } from 'react-icons/hi2';
+import Link from 'next/link';
 import UserEditModal from '@/components/admin/UserEditModal';
 
 export default function UsersClient() {
@@ -107,6 +109,10 @@ export default function UsersClient() {
             <div className="max-w-7xl mx-auto space-y-6">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
+                        <Link href="/" className="inline-flex items-center gap-2 text-zinc-400 hover:text-white transition-colors mb-4 group">
+                            <HiOutlineArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+                            Back to Dashboard
+                        </Link>
                         <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-pink-600 bg-clip-text text-transparent">
                             User Management
                         </h1>
@@ -191,10 +197,10 @@ export default function UsersClient() {
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <span className={`px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full border ${user.role === 'admin' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' :
-                                                        user.role === 'editor' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
-                                                            user.role === 'vip' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                                                                user.role === 'banned' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
-                                                                    'bg-zinc-500/10 text-zinc-400 border-zinc-500/20'
+                                                    user.role === 'editor' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                                                        user.role === 'vip' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                                                            user.role === 'banned' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
+                                                                'bg-zinc-500/10 text-zinc-400 border-zinc-500/20'
                                                     }`}>
                                                     {user.role ? user.role.toUpperCase() : 'USER'}
                                                 </span>
