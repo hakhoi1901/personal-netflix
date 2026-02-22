@@ -13,6 +13,7 @@ export interface Movie {
   description?: string;
   category: 'movie' | 'series'; // Logic flag
   isCompleted: boolean;   // Useful for series (End vs Ongoing)
+  isVip: boolean;         // If true, only VIP/Editor/Admin can watch
   episodes: Episode[];    // Array. If 'movie', this has 1 element. If 'series', >1.
   createdAt: number;      // Timestamp
   updatedAt: number;      // Timestamp

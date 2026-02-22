@@ -1,14 +1,16 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { getAllMovies, getUserProgress, WatchProgress } from '@/lib/firestore';
 import { Movie } from '@/types/movie';
 import MovieCard from '@/components/MovieCard';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/context/AuthContext';
+import { usePermission } from '@/hooks/usePermission';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/firebase/config';
+import { useRouter } from 'next/navigation';
 import {
   HiOutlinePlus,
   HiOutlineFilm,
@@ -16,17 +18,29 @@ import {
   HiOutlineMagnifyingGlass,
   HiOutlinePlayCircle,
   HiOutlineXMark,
+  HiOutlineSparkles,
+  HiOutlineUsers,
 } from 'react-icons/hi2';
+import PageTransition from '@/components/PageTransition';
+import Skeleton from '@/components/ui/Skeleton';
+import { AnimatePresence, motion } from 'framer-motion';
 
 type FilterTab = 'all' | 'movie' | 'series';
 
+/**
+ * Dashboard Page — displays all movies/series in a responsive grid.
+ * Includes: "Continue Watching" row, Smart Search, and Filter tabs.
+ */
 export default function DashboardPage() {
   const [movies, setMovies] = useState<Movie[]>([]);
   const [progress, setProgress] = useState<WatchProgress[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<FilterTab>('all');
+  const [surpriseLoading, setSurpriseLoading] = useState(false);
   const { user } = useAuth();
+  const { can } = usePermission();
+  const router = useRouter();
 
   useEffect(() => {
     async function fetchData() {
@@ -49,6 +63,13 @@ export default function DashboardPage() {
   const handleSignOut = async () => {
     await signOut(auth);
   };
+
+  const handleSurpriseMe = useCallback(() => {
+    if (movies.length === 0) return;
+    setSurpriseLoading(true);
+    const randomMovie = movies[Math.floor(Math.random() * movies.length)];
+    router.push(`/watch?id=${randomMovie.id}`);
+  }, [movies, router]);
 
   // --- Filtered movies ---
   const filteredMovies = useMemo(() => {
@@ -96,28 +117,56 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-zinc-950">
+    <div className="min-h-screen bg-zinc-950 bg-noise font-sans text-zinc-100">
+      {/* Background Ambience */}
+      <div className="fixed inset-0 z-[-1] overflow-hidden pointer-events-none">
+        <div className="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] bg-purple-900/20 blur-[120px] rounded-full mix-blend-screen animate-pulse" style={{ animationDuration: '4s' }} />
+        <div className="absolute top-[10%] -right-[10%] w-[40%] h-[40%] bg-indigo-900/20 blur-[100px] rounded-full mix-blend-screen animate-pulse" style={{ animationDuration: '5s', animationDelay: '1s' }} />
+      </div>
       {/* Header */}
       <header className="sticky top-0 z-50 backdrop-blur-xl bg-zinc-950/80 border-b border-white/5">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/20">
-                <HiOutlineFilm className="w-5 h-5 text-white" />
+            <div className="flex items-center gap-3 group">
+              <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/20 group-hover:shadow-purple-500/40 group-hover:scale-105 transition-all duration-300">
+                <HiOutlineFilm className="w-6 h-6 text-white" />
               </div>
-              <h1 className="text-xl font-bold text-white">Horion</h1>
+              <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-zinc-400 tracking-tight">Horitime</h1>
             </div>
 
             {/* Actions */}
             <div className="flex items-center gap-3">
-              <Link
-                href="/admin/add"
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-sm font-medium rounded-xl transition-all duration-200 shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30 active:scale-95"
+              {/* Surprise Me */}
+              <button
+                onClick={handleSurpriseMe}
+                disabled={movies.length === 0 || surpriseLoading}
+                title="Surprise Me — random movie"
+                className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-zinc-300 hover:text-white text-sm font-medium rounded-xl transition-all duration-200 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                <HiOutlinePlus className="w-4 h-4" />
-                <span className="hidden sm:inline">Add Movie</span>
-              </Link>
+                <HiOutlineSparkles className={`w-4 h-4 ${surpriseLoading ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">Surprise Me</span>
+              </button>
+
+              {can('canCreateMovie') && (
+                <Link
+                  href="/admin/add"
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-sm font-medium rounded-xl transition-all duration-200 shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30 active:scale-95"
+                >
+                  <HiOutlinePlus className="w-4 h-4" />
+                  <span className="hidden sm:inline">Add Movie</span>
+                </Link>
+              )}
+
+              {can('canManageUsers') && (
+                <Link
+                  href="/admin/users"
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white text-sm font-medium rounded-xl transition-all duration-200 shadow-lg shadow-pink-500/20 hover:shadow-pink-500/30 active:scale-95"
+                >
+                  <HiOutlineUsers className="w-4 h-4" />
+                  <span className="hidden sm:inline">Users</span>
+                </Link>
+              )}
 
               <button
                 onClick={handleSignOut}
@@ -135,63 +184,72 @@ export default function DashboardPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
         {/* ─── Continue Watching Section ─── */}
-        {!loading && continueWatchingItems.length > 0 && (
-          <section className="mb-10">
-            <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-              <HiOutlinePlayCircle className="w-6 h-6 text-purple-400" />
-              Continue Watching
-            </h2>
-            <div className="flex gap-4 overflow-x-auto pb-2 custom-scrollbar -mx-1 px-1">
-              {continueWatchingItems.map(({ movie, episode }) => (
-                <Link
-                  key={movie.id}
-                  href={`/watch?id=${movie.id}&episode=${episode.id}`}
-                  className="flex-shrink-0 w-64 sm:w-72 group"
-                >
-                  <div className="relative rounded-xl overflow-hidden bg-zinc-800 shadow-lg transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl group-hover:shadow-purple-500/10">
-                    {/* Poster as background (cropped landscape) */}
-                    <div className="relative aspect-video">
+        <AnimatePresence>
+          {!loading && continueWatchingItems.length > 0 && (
+            <motion.section
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              className="mb-12"
+            >
+              <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                <HiOutlinePlayCircle className="w-6 h-6 text-purple-400" />
+                Continue Watching
+              </h2>
+              <div className="flex gap-4 overflow-x-auto pb-4 custom-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0">
+                {continueWatchingItems.map(({ movie, episode }, index) => (
+                  <Link
+                    key={movie.id}
+                    href={`/watch?id=${movie.id}&episode=${episode.id}`}
+                    className="flex-shrink-0 w-72 sm:w-80 group relative"
+                  >
+                    <div className="relative aspect-video rounded-xl overflow-hidden bg-zinc-900 border border-white/10 shadow-lg transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl group-hover:shadow-purple-500/10 glow-border">
+                      {/* Poster as background */}
                       <Image
                         src={movie.posterUrl}
                         alt={movie.title}
                         fill
-                        sizes="300px"
-                        className="object-cover transition-transform duration-500 group-hover:scale-105"
+                        sizes="320px"
+                        className="object-cover transition-transform duration-700 group-hover:scale-110 opacity-80 group-hover:opacity-100"
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
 
                       {/* Play icon overlay */}
-                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
-                          <HiOutlinePlayCircle className="w-8 h-8 text-white" />
+                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 scale-90 group-hover:scale-100">
+                        <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/20 shadow-xl">
+                          <HiOutlinePlayCircle className="w-8 h-8 text-white fill-white/20" />
                         </div>
                       </div>
 
-                      {/* Info overlay at bottom */}
-                      <div className="absolute bottom-0 left-0 right-0 p-3">
-                        <h3 className="text-white font-semibold text-sm truncate">{movie.title}</h3>
-                        <p className="text-indigo-400 text-xs mt-0.5 truncate">{episode.title}</p>
+                      {/* Info overlay */}
+                      <div className="absolute bottom-0 left-0 right-0 p-4">
+                        <p className="text-purple-300 text-xs font-semibold tracking-wide uppercase mb-1">
+                          Episode {episode.order}
+                        </p>
+                        <h3 className="text-white font-bold text-base truncate">{movie.title}</h3>
+                        <p className="text-zinc-400 text-sm truncate mt-0.5">{episode.title}</p>
+                      </div>
+
+                      {/* Progress bar */}
+                      <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/10">
+                        <div
+                          className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 shadow-[0_0_10px_rgba(168,85,247,0.5)]"
+                          style={{
+                            width: `${Math.min(
+                              ((episode.order) / movie.episodes.length) * 100,
+                              100
+                            )}%`,
+                          }}
+                        />
                       </div>
                     </div>
-
-                    {/* Progress bar at bottom */}
-                    <div className="h-1 bg-zinc-700">
-                      <div
-                        className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 rounded-r-full"
-                        style={{
-                          width: `${Math.min(
-                            ((episode.order) / movie.episodes.length) * 100,
-                            100
-                          )}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </section>
-        )}
+                  </Link>
+                ))}
+              </div>
+            </motion.section>
+          )}
+        </AnimatePresence>
 
         {/* ─── Search & Filter Bar ─── */}
         <div className="mb-8 space-y-4">
@@ -246,7 +304,7 @@ export default function DashboardPage() {
         {loading && (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6">
             {Array.from({ length: 10 }).map((_, i) => (
-              <div key={i} className="aspect-[2/3] rounded-xl bg-zinc-800/50 animate-pulse" />
+              <Skeleton key={i} className="aspect-[2/3] rounded-xl shadow-lg border border-white/5" />
             ))}
           </div>
         )}
@@ -259,14 +317,18 @@ export default function DashboardPage() {
             </div>
             <h3 className="text-xl font-semibold text-zinc-300 mb-2">No movies yet</h3>
             <p className="text-zinc-500 max-w-sm mb-6">
-              Start building your personal cinema by adding your first movie or series.
+              {can('canCreateMovie')
+                ? 'Start building your personal cinema by adding your first movie or series.'
+                : 'No content available yet. Check back later!'}
             </p>
-            <Link
-              href="/admin/add"
-              className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-medium rounded-xl transition-all shadow-lg shadow-purple-500/20"
-            >
-              Add Your First Movie
-            </Link>
+            {can('canCreateMovie') && (
+              <Link
+                href="/admin/add"
+                className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-medium rounded-xl transition-all shadow-lg shadow-purple-500/20"
+              >
+                Add Your First Movie
+              </Link>
+            )}
           </div>
         )}
 
@@ -284,8 +346,8 @@ export default function DashboardPage() {
         {/* Movie grid */}
         {!loading && filteredMovies.length > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6">
-            {filteredMovies.map((movie) => (
-              <MovieCard key={movie.id} movie={movie} />
+            {filteredMovies.map((movie, index) => (
+              <MovieCard key={movie.id} movie={movie} index={index} isAdmin={can('canUpdateMovie')} />
             ))}
           </div>
         )}

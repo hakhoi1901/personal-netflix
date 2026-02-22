@@ -1,9 +1,11 @@
 'use client';
 
 import { Suspense, useEffect, useState, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getMovieById, saveWatchProgress } from '@/lib/firestore';
 import { useAuth } from '@/context/AuthContext';
+import { usePermission } from '@/hooks/usePermission';
 import { Movie, Episode } from '@/types/movie';
 import DrivePlayer from '@/components/DrivePlayer';
 import EpisodeList from '@/components/EpisodeList';
@@ -12,6 +14,9 @@ import {
     HiOutlineArrowLeft,
     HiOutlineFilm,
     HiOutlineForward,
+    HiOutlineArrowPath,
+    HiOutlineArrowsRightLeft,
+    HiOutlineLockClosed,
 } from 'react-icons/hi2';
 
 /**
@@ -22,61 +27,106 @@ function WatchPageContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { user } = useAuth();
-
-    // Get ID from query param (?id=...) instead of path
+    const { can } = usePermission();
     const id = searchParams.get('id');
 
-    const [movie, setMovie] = useState<Movie | null>(null);
+    const {
+        data: movie,
+        isLoading,
+        isError
+    } = useQuery({
+        queryKey: ['movie', id],
+        queryFn: async () => {
+            if (!id) throw new Error('No ID provided');
+            const data = await getMovieById(id);
+            if (!data) throw new Error('Movie not found');
+            return data;
+        },
+        enabled: !!id,
+        staleTime: 5 * 60 * 1000, // 5 minutes
+    });
+
     const [currentEpisode, setCurrentEpisode] = useState<Episode | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(false);
+    const [shuffleMode, setShuffleMode] = useState(false);
+    const [shuffledEpisodes, setShuffledEpisodes] = useState<Episode[]>([]);
+
+    // Initialize or Update current episode
+    useEffect(() => {
+        if (!movie) return;
+
+        // Ensure episodes are sorted
+        const sorted = [...movie.episodes].sort((a, b) => a.order - b.order);
+
+        // If no episodes, ensure currentEpisode is null
+        if (sorted.length === 0) {
+            setCurrentEpisode(null);
+            return;
+        }
+
+        // If we already have a selected episode that belongs to this movie, don't overwrite it
+        // (Unless we need to validate it exists, which is good practice)
+        if (currentEpisode && sorted.some(ep => ep.id === currentEpisode.id)) {
+            return;
+        }
+
+        // Otherwise, initialize (First load, or ID change, or invalid currentEpisode)
+        const resumeEpisodeId = searchParams.get('episode');
+        if (resumeEpisodeId) {
+            const resumeEp = sorted.find((ep) => ep.id === resumeEpisodeId);
+            setCurrentEpisode(resumeEp ?? sorted[0]);
+        } else {
+            setCurrentEpisode(sorted[0]);
+        }
+
+    }, [movie, searchParams, currentEpisode]); // kept currentEpisode to allow validation check
+
+    // Reset shuffle mode when ID changes
+    useEffect(() => {
+        setShuffleMode(false);
+    }, [id]);
 
     const sortedEpisodes = movie
         ? [...movie.episodes].sort((a, b) => a.order - b.order)
         : [];
 
+    // Fisher-Yates shuffle
+    const shuffleArray = useCallback((arr: Episode[]): Episode[] => {
+        const a = [...arr];
+        for (let i = a.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [a[i], a[j]] = [a[j], a[i]];
+        }
+        return a;
+    }, []);
+
+    const toggleShuffleMode = useCallback(() => {
+        setShuffleMode((prev) => {
+            if (!prev) {
+                // Turning ON — generate a new shuffled order
+                setShuffledEpisodes(shuffleArray(sortedEpisodes));
+            }
+            return !prev;
+        });
+    }, [shuffleArray, sortedEpisodes]);
+
+    const handleRandomEpisode = useCallback(() => {
+        if (sortedEpisodes.length <= 1) return;
+        const others = sortedEpisodes.filter((ep) => ep.id !== currentEpisode?.id);
+        const randomEp = others[Math.floor(Math.random() * others.length)];
+        setCurrentEpisode(randomEp);
+        saveProgress(randomEp);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [sortedEpisodes, currentEpisode]);
+
+    // The active episode queue (shuffled or sorted)
+    const activeQueue = shuffleMode ? shuffledEpisodes : sortedEpisodes;
+
     const currentIndex = currentEpisode
-        ? sortedEpisodes.findIndex((ep) => ep.id === currentEpisode.id)
+        ? activeQueue.findIndex((ep) => ep.id === currentEpisode.id)
         : -1;
 
-    const hasNextEpisode = currentIndex >= 0 && currentIndex < sortedEpisodes.length - 1;
-    const nextEpisode = hasNextEpisode ? sortedEpisodes[currentIndex + 1] : null;
-
-    useEffect(() => {
-        async function fetchMovie() {
-            if (!id) {
-                // No ID provided in URL
-                setLoading(false);
-                setError(true);
-                return;
-            }
-
-            try {
-                const data = await getMovieById(id);
-                if (!data) {
-                    setError(true);
-                    return;
-                }
-                setMovie(data);
-
-                const resumeEpisodeId = searchParams.get('episode');
-                const sorted = [...data.episodes].sort((a, b) => a.order - b.order);
-
-                if (resumeEpisodeId) {
-                    const resumeEp = sorted.find((ep) => ep.id === resumeEpisodeId);
-                    setCurrentEpisode(resumeEp ?? sorted[0] ?? null);
-                } else if (sorted.length > 0) {
-                    setCurrentEpisode(sorted[0]);
-                }
-            } catch (err) {
-                console.error('Failed to fetch movie:', err);
-                setError(true);
-            } finally {
-                setLoading(false);
-            }
-        }
-        fetchMovie();
-    }, [id, searchParams]);
+    const hasNextEpisode = currentIndex >= 0 && currentIndex < activeQueue.length - 1;
+    const nextEpisode = hasNextEpisode ? activeQueue[currentIndex + 1] : null;
 
     const saveProgress = useCallback(
         async (episode: Episode) => {
@@ -112,7 +162,7 @@ function WatchPageContent() {
         }
     };
 
-    if (loading) {
+    if (isLoading) {
         return (
             <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
                 <div className="flex flex-col items-center gap-4">
@@ -123,7 +173,7 @@ function WatchPageContent() {
         );
     }
 
-    if (error || !movie) {
+    if (isError || !movie) {
         return (
             <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
                 <div className="flex flex-col items-center gap-4 text-center px-4">
@@ -135,6 +185,32 @@ function WatchPageContent() {
                     <Link
                         href="/"
                         className="mt-2 px-6 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-medium rounded-xl transition-all"
+                    >
+                        Back to Library
+                    </Link>
+                </div>
+            </div>
+        );
+    }
+
+    // VIP content gate: block non-VIP users from watching VIP movies
+    if (movie.isVip && !can('canWatchVipContent')) {
+        return (
+            <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+                <div className="flex flex-col items-center gap-5 text-center px-6 max-w-sm">
+                    <div className="w-20 h-20 bg-amber-500/10 rounded-2xl flex items-center justify-center border border-amber-500/20">
+                        <HiOutlineLockClosed className="w-10 h-10 text-amber-400" />
+                    </div>
+                    <div>
+                        <p className="text-amber-400 text-sm font-semibold tracking-wide uppercase mb-2">👑 VIP Content</p>
+                        <h2 className="text-xl font-bold text-white mb-2">{movie.title}</h2>
+                        <p className="text-zinc-400 text-sm leading-relaxed">
+                            This content is exclusive to VIP members. Upgrade your account to watch.
+                        </p>
+                    </div>
+                    <Link
+                        href="/"
+                        className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-medium rounded-xl transition-all"
                     >
                         Back to Library
                     </Link>
@@ -156,12 +232,40 @@ function WatchPageContent() {
                             <span className="text-sm font-medium">Library</span>
                         </Link>
                         <div className="h-5 w-px bg-white/10" />
-                        <h1 className="text-sm font-medium text-white truncate">{movie.title}</h1>
+                        <h1 className="text-sm font-medium text-white truncate flex-1 min-w-0">{movie.title}</h1>
                         {currentEpisode && movie.category === 'series' && (
                             <>
                                 <div className="h-5 w-px bg-white/10" />
                                 <span className="text-sm text-zinc-400 truncate">{currentEpisode.title}</span>
                             </>
+                        )}
+
+                        {/* Episode controls — only for series with multiple episodes */}
+                        {movie.episodes.length > 1 && (
+                            <div className="ml-auto flex items-center gap-1.5 flex-shrink-0">
+                                {/* Random Episode */}
+                                <button
+                                    onClick={handleRandomEpisode}
+                                    title="Random Episode"
+                                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-zinc-400 hover:text-white hover:bg-white/10 rounded-lg transition-all text-xs font-medium"
+                                >
+                                    <HiOutlineArrowPath className="w-4 h-4" />
+                                    <span className="hidden sm:inline">Random</span>
+                                </button>
+
+                                {/* Shuffle Mode */}
+                                <button
+                                    onClick={toggleShuffleMode}
+                                    title={shuffleMode ? 'Shuffle: ON' : 'Shuffle: OFF'}
+                                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all text-xs font-medium ${shuffleMode
+                                        ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+                                        : 'text-zinc-400 hover:text-white hover:bg-white/10'
+                                        }`}
+                                >
+                                    <HiOutlineArrowsRightLeft className="w-4 h-4" />
+                                    <span className="hidden sm:inline">Shuffle</span>
+                                </button>
+                            </div>
                         )}
                     </div>
                 </div>
@@ -171,7 +275,17 @@ function WatchPageContent() {
                 <div className="flex flex-col lg:flex-row">
                     <div className="flex-1 p-4 sm:p-6">
                         {currentEpisode ? (
-                            <DrivePlayer driveId={currentEpisode.driveId} />
+                            <div className="space-y-4">
+                                <DrivePlayer driveId={currentEpisode.driveId} />
+                                <div className="flex flex-col gap-1">
+                                    <h1 className="text-2xl font-bold text-white leading-tight">
+                                        {currentEpisode.title}
+                                    </h1>
+                                    <p className="text-zinc-400 text-sm">
+                                        Episode {currentEpisode.order}
+                                    </p>
+                                </div>
+                            </div>
                         ) : (
                             <div className="aspect-video bg-zinc-900 rounded-xl flex items-center justify-center">
                                 <p className="text-zinc-500">No episodes available</p>
@@ -198,9 +312,9 @@ function WatchPageContent() {
                             </button>
                         )}
 
-                        <div className="mt-6">
-                            <h2 className="text-xl font-bold text-white">{movie.title}</h2>
-                            <div className="flex items-center gap-3 mt-2">
+                        <div className="mt-8 pt-8 border-t border-white/5">
+                            <h2 className="text-lg font-semibold text-zinc-200 mb-2">About {movie.title}</h2>
+                            <div className="flex items-center gap-3 mb-4">
                                 <span
                                     className={`px-2.5 py-1 text-xs font-semibold rounded-lg ${movie.category === 'series'
                                         ? 'bg-indigo-500/20 text-indigo-400'
@@ -224,7 +338,7 @@ function WatchPageContent() {
                                 )}
                             </div>
                             {movie.description && (
-                                <p className="text-zinc-400 mt-4 text-sm leading-relaxed max-w-3xl">
+                                <p className="text-zinc-400 text-sm leading-relaxed max-w-3xl">
                                     {movie.description}
                                 </p>
                             )}
@@ -235,10 +349,10 @@ function WatchPageContent() {
                         <div className="lg:w-80 xl:w-96 border-t lg:border-t-0 lg:border-l border-white/5 bg-zinc-900/30">
                             <div className="lg:sticky lg:top-14 lg:h-[calc(100vh-3.5rem)]">
                                 <EpisodeList
-                                    episodes={movie.episodes}
+                                    episodes={shuffleMode ? shuffledEpisodes : movie.episodes}
                                     currentEpisodeId={currentEpisode.id}
                                     onSelect={handleEpisodeChange}
-                                    movieTitle={movie.title}
+                                    movieTitle="Episodes" // Changed from movie.title
                                 />
                             </div>
                         </div>

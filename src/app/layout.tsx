@@ -1,13 +1,16 @@
 
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Outfit } from "next/font/google"; // Changed from Inter to Outfit - more cinematic/modern
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import AuthGuard from "@/components/AuthGuard";
+import Providers from "@/components/Providers";
 
-const inter = Inter({
-  variable: "--font-geist-sans",
+// Configure Outfit font
+const outfit = Outfit({
+  variable: "--font-outfit",
   subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -34,9 +37,11 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
-      <body className={`${inter.variable} antialiased bg-zinc-950 text-white`} suppressHydrationWarning>
+      <body className={`${outfit.variable} antialiased bg-zinc-950 text-white font-sans`} suppressHydrationWarning>
         <AuthProvider>
-          <AuthGuard>{children}</AuthGuard>
+          <AuthGuard>
+            <Providers>{children}</Providers>
+          </AuthGuard>
         </AuthProvider>
       </body>
     </html>

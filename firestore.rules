@@ -1,0 +1,76 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Helper: Get the calling user's permissions object ───────────────
+    // We check permissions fields directly (NOT role strings) to avoid
+    // privilege escalation via role field manipulation.
+    function userPermissions() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.permissions;
+    }
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // ─── USERS COLLECTION ────────────────────────────────────────────────
+    match /users/{userId} {
+      // Users can only read their own profile
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+
+      // New users can create their own profile on first login,
+      // but CANNOT self-assign any elevated role or permissions.
+      // The only allowed role on create is 'user'.
+      allow create: if isAuthenticated()
+                    && request.auth.uid == userId
+                    && request.resource.data.role == 'user'
+                    && request.resource.data.permissions.canManageUsers == false
+                    && request.resource.data.permissions.canDeleteMovie == false
+                    && request.resource.data.permissions.canCreateMovie == false
+                    && request.resource.data.permissions.canUpdateMovie == false
+                    && request.resource.data.permissions.canViewAdminPanel == false
+                    && request.resource.data.permissions.canWatchVipContent == false;
+
+      // Users can update their own profile (e.g. display name),
+      // but CANNOT touch role or permissions fields (prevents privilege escalation).
+      allow update: if isAuthenticated()
+                    && request.auth.uid == userId
+                    && !request.resource.data.diff(resource.data).affectedKeys()
+                        .hasAny(['role', 'permissions']);
+
+      // Only users with canManageUsers permission can update other users' roles/permissions
+      allow update: if isAuthenticated()
+                    && userPermissions().canManageUsers == true;
+
+      // Only admins (canManageUsers) can delete user documents
+      allow delete: if isAuthenticated()
+                    && userPermissions().canManageUsers == true;
+    }
+
+    // ─── USERS / PROGRESS SUBCOLLECTION ──────────────────────────────────
+    match /users/{userId}/progress/{movieId} {
+      // Users can only read/write their own watch progress
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // ─── MOVIES COLLECTION ───────────────────────────────────────────────
+    match /movies/{movieId} {
+      // Any authenticated user can read movies.
+      // VIP content filtering is handled client-side (and enforced by the
+      // fact that the player URL is only rendered for permitted users).
+      allow read: if isAuthenticated();
+
+      // Only users with canCreateMovie can add new movies
+      allow create: if isAuthenticated()
+                    && userPermissions().canCreateMovie == true;
+
+      // Only users with canUpdateMovie can edit movies
+      allow update: if isAuthenticated()
+                    && userPermissions().canUpdateMovie == true;
+
+      // Only users with canDeleteMovie can hard-delete movies
+      allow delete: if isAuthenticated()
+                    && userPermissions().canDeleteMovie == true;
+    }
+  }
+}
