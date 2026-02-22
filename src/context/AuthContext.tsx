@@ -51,9 +51,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                         const permissions = data.permissions ?? getPermissionsByRole(role);
                         setUser({ ...firebaseUser, role, permissions } as AppUser);
                     } else {
-                        // Brand new user: create document with default 'user' role
-                        const defaultRole: UserRole = 'user';
+                        // Brand new user: check if this is the bootstrap admin
+                        const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
+                        const isBootstrapAdmin = firebaseUser.email === adminEmail;
+
+                        const defaultRole: UserRole = isBootstrapAdmin ? 'admin' : 'user';
                         const defaultPermissions = getPermissionsByRole(defaultRole);
+
                         const newUserData = {
                             email: firebaseUser.email,
                             role: defaultRole,

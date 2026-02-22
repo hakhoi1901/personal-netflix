@@ -1,34 +1,20 @@
 'use client';
 
-import { useAuth } from '@/context/AuthContext';
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
-
-type Permission = 'canViewAdminPanel';
+import { usePermission } from '@/hooks/usePermission';
+import { UserPermissions } from '@/types/user';
 
 interface PermissionGuardProps {
     children: React.ReactNode;
-    require: Permission;
+    require: keyof UserPermissions;
 }
 
 /**
- * PermissionGuard restricts access based on user roles/permissions.
- * Currently, canViewAdminPanel is restricted to a specific admin email.
+ * PermissionGuard restricts access based on user roles/permissions fetched from Firestore.
  */
 export default function PermissionGuard({ children, require }: PermissionGuardProps) {
-    const { user, loading } = useAuth();
-    const router = useRouter();
+    const { can, loading } = usePermission();
 
-    const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
-    const isAdmin = user?.email === adminEmail;
-
-    const hasPermission = require === 'canViewAdminPanel' ? isAdmin : false;
-
-    useEffect(() => {
-        if (!loading && !hasPermission) {
-            router.push('/');
-        }
-    }, [hasPermission, loading, router]);
+    const hasPermission = can(require);
 
     if (loading) {
         return (
