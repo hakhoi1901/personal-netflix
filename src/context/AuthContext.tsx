@@ -12,7 +12,8 @@ import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '@/firebase/config';
 import { AppUser, UserRole } from '@/types/user';
 import { getPermissionsByRole } from '@/lib/permissions';
-import { syncUserPermissionsAction, CURRENT_PERMISSIONS_VERSION } from '@/app/actions/admin-actions';
+import { syncUserPermissionsAction } from '@/app/actions/admin-actions';
+import { CURRENT_PERMISSIONS_VERSION } from '@/lib/permissions';
 
 interface AuthContextType {
     user: AppUser | null;

@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "theater",
+    "slug": "theater",
+    "version": "1.0.0",
+    "extra": {
+      "eas": {
+        "projectId": "589ec763-573f-4505-8bd1-6dc248f72a50"
+      }
+    },
+    "android": {
+      "package": "com.hakhoi1901.theater",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      }
+    }
+  }
+}

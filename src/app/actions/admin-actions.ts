@@ -12,13 +12,12 @@
  */
 
 import { adminAuth, adminDb } from '@/lib/firebase-admin';
-import { getPermissionsByRole } from '@/lib/permissions';
+import { getPermissionsByRole, CURRENT_PERMISSIONS_VERSION } from '@/lib/permissions';
 import { UserRole } from '@/types/user';
 import { FieldValue } from 'firebase-admin/firestore';
 
 // The current version of the permission schema.
 // Bump this number whenever you change PERMISSION_MATRIX in permissions.ts.
-export const CURRENT_PERMISSIONS_VERSION = 1;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // INTERNAL HELPER

@@ -5,6 +5,10 @@ import { UserRole, UserPermissions } from '@/types/user';
  * Used when creating a new user or when an admin updates a user's role.
  * Storing permissions denormalized on the user document avoids runtime role lookups.
  */
+
+
+export const CURRENT_PERMISSIONS_VERSION = 1;
+
 const PERMISSION_MATRIX: Record<UserRole, UserPermissions> = {
     admin: {
         canManageUsers: true,
