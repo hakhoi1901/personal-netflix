@@ -2,9 +2,16 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ─── Helper: Get the calling user's permissions object ───────────────
-    // We check permissions fields directly (NOT role strings) to avoid
-    // privilege escalation via role field manipulation.
+    // ─── Helper Functions ──────────────────────────────────────────────────
+    //
+    // SECURITY NOTE: userPermissions() fetches the caller's permissions object
+    // directly from Firestore — NOT from the auth token payload or any
+    // client-supplied value. This prevents privilege escalation via client-side
+    // token/role manipulation.
+    //
+    // CAUTION: get() will throw if the user doc doesn't exist yet.
+    // Only call userPermissions() in rules where we know the doc exists
+    // (i.e., NOT in `allow create` blocks for the users collection itself).
     function userPermissions() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.permissions;
     }
@@ -13,14 +20,25 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // ─── USERS COLLECTION ────────────────────────────────────────────────
-    match /users/{userId} {
-      // Users can only read their own profile
-      allow read: if isAuthenticated() && request.auth.uid == userId;
+    // Data Validation: enforce minimum required fields on movie writes.
+    // Prevents junk / malformed documents from being written to the DB.
+    function isValidMovieData() {
+      let d = request.resource.data;
+      return d.title is string && d.title.size() > 0
+          && d.description is string;
+    }
 
-      // New users can create their own profile on first login,
-      // but CANNOT self-assign any elevated role or permissions.
-      // The only allowed role on create is 'user'.
+    // ─── USERS COLLECTION ─────────────────────────────────────────────────
+    match /users/{userId} {
+      // Users can read their own profile.
+      // Admins (canManageUsers) can read any user's profile (for the admin panel).
+      allow read: if isAuthenticated()
+                  && (request.auth.uid == userId
+                      || userPermissions().canManageUsers == true);
+
+      // New users create their own profile on first login via AuthContext.
+      // SECURITY: Role MUST be 'user' and ALL elevated permissions MUST be false.
+      // Admins are promoted server-side via bootstrapAdminAction (Firebase Admin SDK).
       allow create: if isAuthenticated()
                     && request.auth.uid == userId
                     && request.resource.data.role == 'user'
@@ -31,46 +49,67 @@ service cloud.firestore {
                     && request.resource.data.permissions.canViewAdminPanel == false
                     && request.resource.data.permissions.canWatchVipContent == false;
 
-      // Users can update their own profile (e.g. display name),
-      // but CANNOT touch role or permissions fields (prevents privilege escalation).
+      // Self-update: users can update their own profile (e.g. display name),
+      // but CANNOT modify 'role' or 'permissions' fields (prevents privilege escalation).
       allow update: if isAuthenticated()
                     && request.auth.uid == userId
                     && !request.resource.data.diff(resource.data).affectedKeys()
                         .hasAny(['role', 'permissions']);
 
-      // Only users with canManageUsers permission can update other users' roles/permissions
+      // Admin update: only users with canManageUsers can update roles/permissions.
+      // Note: server-side actions (bootstrapAdminAction, syncUserPermissionsAction)
+      // bypass these rules by using the Firebase Admin SDK — which is correct.
       allow update: if isAuthenticated()
                     && userPermissions().canManageUsers == true;
 
-      // Only admins (canManageUsers) can delete user documents
+      // Only admins can hard-delete user documents.
       allow delete: if isAuthenticated()
                     && userPermissions().canManageUsers == true;
     }
 
-    // ─── USERS / PROGRESS SUBCOLLECTION ──────────────────────────────────
+    // ─── USERS / PROGRESS SUBCOLLECTION ───────────────────────────────────
     match /users/{userId}/progress/{movieId} {
-      // Users can only read/write their own watch progress
+      // Users can only read/write their own watch progress.
       allow read, write: if isAuthenticated() && request.auth.uid == userId;
     }
 
-    // ─── MOVIES COLLECTION ───────────────────────────────────────────────
+    // ─── MOVIES COLLECTION ────────────────────────────────────────────────
     match /movies/{movieId} {
-      // Any authenticated user can read movies.
-      // VIP content filtering is handled client-side (and enforced by the
-      // fact that the player URL is only rendered for permitted users).
+      // Any authenticated user can read movie metadata (title, thumbnail, description).
+      // This is intentional — even VIP movies must be VISIBLE to all users (for UX/marketing).
+      // The actual stream URLs are protected in the /private_streams subcollection below.
       allow read: if isAuthenticated();
 
-      // Only users with canCreateMovie can add new movies
+      // Only editors/admins with canCreateMovie can add new movies.
+      // isValidMovieData() enforces the required schema to prevent junk writes.
       allow create: if isAuthenticated()
-                    && userPermissions().canCreateMovie == true;
+                    && userPermissions().canCreateMovie == true
+                    && isValidMovieData();
 
-      // Only users with canUpdateMovie can edit movies
+      // Only editors/admins with canUpdateMovie can edit movie metadata.
       allow update: if isAuthenticated()
-                    && userPermissions().canUpdateMovie == true;
+                    && userPermissions().canUpdateMovie == true
+                    && isValidMovieData();
 
-      // Only users with canDeleteMovie can hard-delete movies
+      // Only admins with canDeleteMovie can hard-delete.
       allow delete: if isAuthenticated()
                     && userPermissions().canDeleteMovie == true;
+
+      // ─── FIX: VIP Content Segmentation ──────────────────────────────────
+      // driveId / videoUrl and any sensitive stream links are stored here,
+      // NOT on the parent /movies document.
+      //
+      // This lets ALL authenticated users see the movie card (thumbnail, title,
+      // description) in the UI, but ONLY VIP members and Admins can actually
+      // retrieve the stream URL and play the content.
+      match /private_streams/{streamId} {
+        allow read: if isAuthenticated()
+                    && (userPermissions().canWatchVipContent == true
+                        || userPermissions().canViewAdminPanel == true);
+
+        allow write: if isAuthenticated()
+                     && userPermissions().canUpdateMovie == true;
+      }
     }
   }
 }

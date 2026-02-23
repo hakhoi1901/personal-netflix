@@ -12,6 +12,7 @@ import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '@/firebase/config';
 import { AppUser, UserRole } from '@/types/user';
 import { getPermissionsByRole } from '@/lib/permissions';
+import { syncUserPermissionsAction, CURRENT_PERMISSIONS_VERSION } from '@/app/actions/admin-actions';
 
 interface AuthContextType {
     user: AppUser | null;
@@ -28,8 +29,12 @@ const AuthContext = createContext<AuthContextType>({
  * After auth resolves, it fetches the user's role + permissions from Firestore.
  * `loading` stays true until BOTH auth AND Firestore fetch are complete.
  *
- * Denormalized permissions are stored directly on the user document,
- * so we never need to re-derive them from the role at runtime.
+ * SECURITY: All admin-granting logic has been moved to server-side actions.
+ * The client NEVER reads ADMIN_EMAIL or self-assigns any elevated role.
+ * On first login, new users are ALWAYS created with role: 'user'.
+ *
+ * VERSIONED PERMISSIONS: On each login, if the user's stored permission version
+ * is stale, we call a Zero-Trust Server Action to re-sync permissions server-side.
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<AppUser | null>(null);
@@ -43,20 +48,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     const userSnap = await getDoc(userRef);
 
                     if (userSnap.exists()) {
-                        // Existing user: read role + permissions from Firestore
                         const data = userSnap.data();
                         const role = (data.role ?? 'user') as UserRole;
-                        // Use stored permissions, but fall back to role-derived ones
-                        // in case the document is missing the permissions field
-                        const permissions = data.permissions ?? getPermissionsByRole(role);
+                        let permissions = data.permissions ?? getPermissionsByRole(role);
+
+                        // ─── Versioned Permission Sync ────────────────────────────
+                        // If stored version is behind the current schema version,
+                        // call Zero-Trust Server Action to re-sync. UID is extracted
+                        // from the ID Token server-side — never passed as a raw param.
+                        const storedVersion: number = permissions.version ?? 0;
+                        if (storedVersion < CURRENT_PERMISSIONS_VERSION) {
+                            try {
+                                const idToken = await firebaseUser.getIdToken();
+                                const result = await syncUserPermissionsAction(idToken);
+                                if (result.success && result.synced) {
+                                    // Re-fetch to get the freshly synced permissions
+                                    const freshSnap = await getDoc(userRef);
+                                    if (freshSnap.exists()) {
+                                        permissions = freshSnap.data().permissions ?? permissions;
+                                    }
+                                }
+                            } catch (syncErr) {
+                                // Non-fatal — user keeps their existing permissions for this session
+                                console.warn('[AuthContext] Permission sync failed:', syncErr);
+                            }
+                        }
+                        // ─────────────────────────────────────────────────────────
+
                         setUser({ ...firebaseUser, role, permissions } as AppUser);
                     } else {
-                        // Brand new user: check if this is the bootstrap admin
-                        const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
-                        const isBootstrapAdmin = firebaseUser.email === adminEmail;
-
-                        const defaultRole: UserRole = isBootstrapAdmin ? 'admin' : 'user';
-                        const defaultPermissions = getPermissionsByRole(defaultRole);
+                        // Brand new user: ALWAYS start with 'user' role.
+                        // SECURITY: Admin bootstrapping is done via /bootstrap-admin page
+                        // using a Zero-Trust Server Action that checks email server-side.
+                        const defaultRole: UserRole = 'user';
+                        const defaultPermissions = {
+                            ...getPermissionsByRole(defaultRole),
+                            version: CURRENT_PERMISSIONS_VERSION,
+                        };
 
                         const newUserData = {
                             email: firebaseUser.email,
@@ -73,7 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     }
                 } catch (err) {
                     // Firestore unavailable (offline/network error): default to 'user'
-                    console.error('Failed to fetch user data from Firestore:', err);
+                    console.error('[AuthContext] Failed to fetch user data from Firestore:', err);
                     setUser({
                         ...firebaseUser,
                         role: 'user',
