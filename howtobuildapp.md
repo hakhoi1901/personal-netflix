@@ -15,4 +15,4 @@ cd android
 ## B4
 
 cd ..
-& ".\android-sdk\build-tools\35.0.0\apksigner.bat" sign --ks my-release-key.jks --out horion.ver1.2.1.apk ".\android\app\build\outputs\apk\release\app-release-unsigned.apk"
+& ".\android-sdk\build-tools\35.0.0\apksigner.bat" sign --ks my-release-key.jks --out horitime.ver1.2.1.apk ".\android\app\build\outputs\apk\release\app-release-unsigned.apk"

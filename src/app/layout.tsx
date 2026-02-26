@@ -14,7 +14,7 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
-  title: "Horion — Personal Cinema",
+  title: "HoriTime — Personal Cinema",
   description: "Your personal movie and series streaming platform",
 };
 
